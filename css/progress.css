@@ -1,0 +1,236 @@
+/* Progress Visualization System */
+
+:root {
+  /* Local Overrides/Defaults if main vars missing */
+  --prog-brand: var(--brand-primary, #3b82f6);
+  --prog-success: #10b981;
+  --prog-warning: #f59e0b;
+  --prog-danger: #ef4444;
+  --prog-surface: var(--background-surface, #ffffff);
+  --prog-text: var(--text-primary, #111827);
+  --prog-text-muted: var(--text-secondary, #6b7280);
+  --prog-track: var(--border-color, #e5e7eb);
+
+  /* Animation Timing */
+  --anim-speed: 600ms;
+  --anim-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+  /* Spring-like pop */
+}
+
+/* -------------------------------------------------------------------------- */
+/* Utilities & Base */
+/* -------------------------------------------------------------------------- */
+
+.pv-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.pv-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.25rem;
+}
+
+.pv-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--prog-text);
+  letter-spacing: -0.01em;
+}
+
+.pv-value {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--prog-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Horizontal Progress Bar */
+/* -------------------------------------------------------------------------- */
+
+.pv-bar-track {
+  width: 100%;
+  height: 8px;
+  background-color: var(--prog-track);
+  border-radius: 999px;
+  overflow: hidden;
+  position: relative;
+}
+
+.pv-bar-fill {
+  height: 100%;
+  background-color: var(--prog-brand);
+  border-radius: 999px;
+  width: 0%;
+  /* JS animates this */
+  transition: width var(--anim-speed) var(--anim-ease), background-color 0.3s ease;
+  position: relative;
+}
+
+/* Color States */
+.pv-bar-fill[data-state="neutral"] {
+  background-color: var(--prog-brand);
+}
+
+.pv-bar-fill[data-state="warning"] {
+  background-color: var(--prog-warning);
+}
+
+.pv-bar-fill[data-state="danger"] {
+  background-color: var(--prog-danger);
+}
+
+.pv-bar-fill[data-state="success"] {
+  background-color: var(--prog-success);
+}
+
+/* Glow Effect for Milestones */
+.pv-milestone-glow {
+  animation: pv-pulse 2s infinite;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Circular Progress Ring */
+/* -------------------------------------------------------------------------- */
+
+.pv-ring-wrapper {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pv-ring-svg {
+  transform: rotate(-90deg);
+  width: 100%;
+  height: 100%;
+}
+
+.pv-ring-circle-bg {
+  fill: none;
+  stroke: var(--prog-track);
+  stroke-width: 8;
+}
+
+.pv-ring-circle-fg {
+  fill: none;
+  stroke: var(--prog-brand);
+  stroke-width: 8;
+  stroke-linecap: round;
+  stroke-dasharray: 0 1000;
+  /* Set by JS */
+  transition: stroke-dasharray var(--anim-speed) ease-out, stroke 0.3s ease;
+}
+
+.pv-ring-content {
+  position: absolute;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pv-ring-percent {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--prog-text);
+  line-height: 1;
+}
+
+.pv-ring-label {
+  font-size: 0.75rem;
+  color: var(--prog-text-muted);
+  margin-top: 4px;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Mini Sparkline */
+/* -------------------------------------------------------------------------- */
+
+.pv-sparkline-wrapper {
+  width: 100%;
+  height: 60px;
+  position: relative;
+}
+
+.pv-sparkline-svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.pv-sparkline-path {
+  fill: none;
+  stroke: var(--prog-brand);
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  filter: drop-shadow(0 4px 6px rgba(59, 130, 246, 0.1));
+}
+
+.pv-sparkline-fill {
+  fill: url(#gradient-fill);
+  opacity: 0.2;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Feedback & Confetti */
+/* -------------------------------------------------------------------------- */
+
+.pv-feedback-toast {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--prog-text);
+  color: var(--prog-surface);
+  padding: 4px 12px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.pv-feedback-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Animations */
+/* -------------------------------------------------------------------------- */
+
+@keyframes pv-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(16, 185, 129, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+  .pv-bar-fill,
+  .pv-ring-circle-fg,
+  .pv-feedback-toast {
+    transition: none;
+    animation: none;
+  }
+}
