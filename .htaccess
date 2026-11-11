@@ -1,0 +1,13 @@
+# Do not expose directory contents.
+Options -Indexes
+
+# Protect environment and Composer metadata.
+<FilesMatch "^(\.env(?:\..*)?|composer\.(?:json|lock))$">
+    Require all denied
+</FilesMatch>
+
+# Database setup files and dependency source should not be downloadable.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^(?:sql|vendor)/ - [F,L,NC]
+</IfModule>
