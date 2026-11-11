@@ -1,7 +1,3 @@
-DROP DATABASE IF EXISTS expensetracker;
-CREATE DATABASE IF NOT EXISTS expensetracker;
-USE expensetracker;
-
 -- Users Table
 CREATE TABLE IF NOT EXISTS users (
     id INT AUTO_INCREMENT PRIMARY KEY,
