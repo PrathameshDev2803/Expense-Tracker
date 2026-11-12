@@ -27,7 +27,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
-          extensions: mbstring, mysqli, pdo, json
+          extensions: mbstring, mysqli, pdo, json, ftp
           tools: composer:v2
           coverage: none
 
@@ -85,42 +85,11 @@ jobs:
             echo "FTP deployment skipped. Missing secrets: ${missing[*]}"
           fi
 
-      - name: Deploy website using LFTP
+      - name: Deploy website to InfinityFree
         if: steps.check_ftp.outputs.has_ftp == 'true'
         env:
           FTP_HOST: ${{ secrets.INFINITYFREE_FTP_HOST }}
           FTP_USERNAME: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
           FTP_PASSWORD: ${{ secrets.INFINITYFREE_FTP_PASSWORD }}
-          REMOTE_DIR: ${{ steps.check_ftp.outputs.remote_dir }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          sudo apt-get update -qq && sudo apt-get install -y -qq lftp
-          echo "Starting LFTP upload to ${REMOTE_DIR} on ${FTP_HOST}..."
-          lftp -e "
-            set ftp:ssl-allow true;
-            set ssl:verify-certificate false;
-            set ftp:ssl-protect-data false;
-            set ftp:passive-mode true;
-            set net:timeout 60;
-            set net:max-retries 3;
-            open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_HOST\";
-            pwd;
-            ls;
-            mirror --reverse --delete=false --verbose=1 \
-              --exclude-glob \".git*\" \
-              --exclude-glob \".github/**\" \
-              --exclude-glob \".vscode/**\" \
-              --exclude-glob \".env*\" \
-              --exclude-glob \"vendor/**\" \
-              --exclude-glob \"tests/**\" \
-              --exclude-glob \"test/**\" \
-              --exclude-glob \"scratch/**\" \
-              --exclude-glob \"node_modules/**\" \
-              --exclude-glob \"*.sql\" \
-              --exclude-glob \"*.log\" \
-              --exclude-glob \"inht-backup/**\" \
-              --exclude \"README.md\" \
-              ./ \"$REMOTE_DIR\";
-            bye
-          "
+          FTP_REMOTE_DIR: ${{ steps.check_ftp.outputs.remote_dir }}
+        run: php scripts/deploy.php
