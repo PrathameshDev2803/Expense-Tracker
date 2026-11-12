@@ -163,75 +163,50 @@ DB_PASS_LIVE=
 
 ## GitHub Actions CI/CD Deployment
 
-The repository includes automated CI/CD deployment configured at `.github/workflows/deploy.yml`.
+The repository includes `.github/workflows/deploy.yml`. It validates the PHP project on every push to `master` and supports optional automatic deployment to InfinityFree using explicit FTPS.
 
-### Deployment Pipeline Workflow
+InfinityFree staff have confirmed that GitHub Actions-based uploads are allowed, provided they do not create unreasonable FTP-server load. See the [InfinityFree support confirmation](https://forum.infinityfree.com/t/using-github-actions-for-automatic-upload-to-infinityfree/111008/3).
 
-```
-Push to master / Manual trigger
-            │
-            ▼
-    Checkout Repository
-            │
-            ▼
-    Setup PHP 8.3 & Composer
-            │
-            ▼
-   Validate composer.json
-            │
-            ▼
- Install Composer Dependencies
-   (--no-dev --optimize-autoloader)
-            │
-            ▼
-    Run PHP Syntax Checks
- (All project PHP files, excluding vendor)
-            │
-            ▼
-   Deploy via FTPS (Port 21)
-   (airvzxf/ftp-deployment-action@v4.0.1)
-```
+### Pipeline
 
-### Triggers
+1. Check out the `master` branch.
+2. Set up PHP 8.3, required extensions, and Composer.
+3. Validate Composer configuration and install production dependencies.
+4. Fail if a real `.env` file is tracked in Git.
+5. Run PHP syntax checks on application files.
+6. Deploy over explicit FTPS only when the deployment gate is enabled.
 
-- **Push to `master` branch**: Automatically validates and deploys updates to production.
-- **Manual dispatch (`workflow_dispatch`)**: Trigger deployment on-demand from the GitHub Actions tab.
+### First-time deployment gate
 
----
+The workflow intentionally skips the FTP upload until the GitHub repository variable `INFINITYFREE_DEPLOY_ENABLED` is set to `true`. Keep it unset or set it to `false` while the custom domain and FTP destination folder are being configured. CI validation still runs normally.
 
-## Required GitHub Repository Secrets
+### Required GitHub Actions secrets
 
-Configure the following encrypted secrets in your GitHub repository under **Settings > Secrets and variables > Actions**:
+Configure these under **Settings → Secrets and variables → Actions → Secrets**:
 
-| Secret Name | Description | Example Value |
-| :--- | :--- | :--- |
-| `INFINITYFREE_FTP_HOST` | FTP Hostname from InfinityFree FTP Details | `ftpupload.net` |
-| `INFINITYFREE_FTP_USERNAME` | FTP Username from InfinityFree vPanel | `if0_12345678` or `epiz_12345678` |
-| `INFINITYFREE_FTP_PASSWORD` | FTP / vPanel account password | *(Your hosting password)* |
-| `INFINITYFREE_FTP_REMOTE_DIR` | Destination path on remote server | `/htdocs/` |
+| Secret | Purpose |
+|---|---|
+| `INFINITYFREE_FTP_HOST` | FTP hostname from InfinityFree FTP Details (normally `ftpupload.net`) |
+| `INFINITYFREE_FTP_USERNAME` | FTP username shown in FTP Details |
+| `INFINITYFREE_FTP_PASSWORD` | FTP password shown in FTP Details |
+| `INFINITYFREE_FTP_REMOTE_DIR` | Exact remote document root for the custom domain, ending in `/` |
 
-> **Note**: For addon or custom subdomains, set `INFINITYFREE_FTP_REMOTE_DIR` to your domain folder, e.g., `/yourdomain.com/htdocs/`.
+Configure the repository variable under **Settings → Secrets and variables → Actions → Variables**:
 
----
+| Variable | Value |
+|---|---|
+| `INFINITYFREE_DEPLOY_ENABLED` | `false` until the FTP destination is confirmed; then `true` |
 
-## Security & Deployment Safeguards
+Do not use the account's temporary-domain directory by assumption. Confirm the custom domain's document root in InfinityFree File Manager before enabling uploads.
 
-1. **Production `.env` Protection**:
-   - The deployment workflow excludes `.env*` from file transfers. Your live `.env` on InfinityFree is never overwritten during deployment.
-2. **Non-Destructive Synchronization**:
-   - `delete: "false"` is enforced in the FTP action. Existing server-side configuration, logs, and uploads are preserved and never deleted.
-3. **Vendor Directory Deployed**:
-   - Composer dependencies are generated during CI and deployed directly to `htdocs/vendor/`, eliminating the need for SSH or Composer on shared hosting.
-4. **Excluded Assets**:
-   - The transfer automatically excludes development clutter: `.git*`, `.github*`, `.vscode*`, `node_modules*`, `README.md`, `sql*`, and logs.
-5. **Explicit FTPS (TLS)**:
-   - File transfer connects via explicit FTPS on port 21 using `ftp:ssl-force true` to encrypt authentication and data channels.
-6. **Concurrency Locks**:
-   - `concurrency.group: production-deployment` prevents overlapping or conflicting simultaneous deployments.
-7. **Branch Protection**:
-   - Deployments only trigger from the authoritative `master` branch. Pull requests from forks are strictly prevented from triggering deployment.
+### Deployment safeguards
 
----
+- Explicit FTPS on port 21 with strict certificate validation.
+- `.env*`, `.git*`, `.github/`, editor files, SQL scripts, README, tests, logs, and the InfinityFree backup folder are excluded.
+- Composer dependencies are generated in the CI runner and the `vendor/` directory is deployed.
+- `dangerous-clean-slate` is disabled; the workflow will not wipe the whole remote document root.
+- A concurrency lock prevents overlapping production deployments.
+- Only pushes to `master` trigger the deployment workflow; pull requests do not deploy.
 
 ## Author
 
