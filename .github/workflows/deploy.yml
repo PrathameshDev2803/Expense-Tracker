@@ -58,14 +58,8 @@ jobs:
             ! -path './.github/*' \
             -print0 | xargs -0 -r -n1 php -l
 
-      - name: Skip production upload until FTP configuration is enabled
-        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED != 'true' }}
-        run: |
-          echo "PHP validation passed."
-          echo "Production upload is disabled. Add the InfinityFree FTP secrets and set the INFINITYFREE_DEPLOY_ENABLED repository variable to true when the custom-domain document root is confirmed."
-
-      - name: Verify required FTP settings
-        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'true' }}
+      - name: Check FTP deployment configuration
+        id: check_ftp
         env:
           FTP_HOST: ${{ secrets.INFINITYFREE_FTP_HOST }}
           FTP_USERNAME: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
@@ -74,14 +68,25 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          [[ -n "$FTP_HOST" ]] || { echo "::error::Missing INFINITYFREE_FTP_HOST secret"; exit 1; }
-          [[ -n "$FTP_USERNAME" ]] || { echo "::error::Missing INFINITYFREE_FTP_USERNAME secret"; exit 1; }
-          [[ -n "$FTP_PASSWORD" ]] || { echo "::error::Missing INFINITYFREE_FTP_PASSWORD secret"; exit 1; }
-          [[ -n "$FTP_REMOTE_DIR" ]] || { echo "::error::Missing INFINITYFREE_FTP_REMOTE_DIR secret"; exit 1; }
-          [[ "$FTP_REMOTE_DIR" == */ ]] || { echo "::error::INFINITYFREE_FTP_REMOTE_DIR must end with /"; exit 1; }
+          missing=()
+          [[ -n "$FTP_HOST" ]] || missing+=("INFINITYFREE_FTP_HOST")
+          [[ -n "$FTP_USERNAME" ]] || missing+=("INFINITYFREE_FTP_USERNAME")
+          [[ -n "$FTP_PASSWORD" ]] || missing+=("INFINITYFREE_FTP_PASSWORD")
+          [[ -n "$FTP_REMOTE_DIR" ]] || missing+=("INFINITYFREE_FTP_REMOTE_DIR")
+
+          if [ ${#missing[@]} -eq 0 ]; then
+            remote_dir="$FTP_REMOTE_DIR"
+            [[ "$remote_dir" == */ ]] || remote_dir="${remote_dir}/"
+            echo "has_ftp=true" >> "$GITHUB_OUTPUT"
+            echo "remote_dir=$remote_dir" >> "$GITHUB_OUTPUT"
+            echo "All required FTP secrets detected. Target remote directory: $remote_dir"
+          else
+            echo "has_ftp=false" >> "$GITHUB_OUTPUT"
+            echo "FTP deployment skipped. Missing secrets: ${missing[*]}"
+          fi
 
       - name: Deploy website using explicit FTPS
-        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'true' }}
+        if: steps.check_ftp.outputs.has_ftp == 'true'
         uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
           server: ${{ secrets.INFINITYFREE_FTP_HOST }}
@@ -91,7 +96,7 @@ jobs:
           port: 21
           security: strict
           local-dir: ./
-          server-dir: ${{ secrets.INFINITYFREE_FTP_REMOTE_DIR }}
+          server-dir: ${{ steps.check_ftp.outputs.remote_dir }}
           dangerous-clean-slate: false
           timeout: 60000
           log-level: standard
