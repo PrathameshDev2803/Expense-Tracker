@@ -1,8 +1,4 @@
 <?php
-ob_start();
-include_once 'db.php';
-ob_clean();
-
 header('Content-Type: application/json; charset=utf-8');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -14,7 +10,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
     exit;
 }
 
-$username = isset($_GET['username']) ? trim((string)$_GET['username']) : '';
+$rawUsername = isset($_GET['username']) ? (string)$_GET['username'] : '';
+$username = trim($rawUsername);
 
 if ($username === '') {
     http_response_code(400);
@@ -22,6 +19,16 @@ if ($username === '') {
         "available" => false, 
         "field" => "username", 
         "message" => "Username is required"
+    ]);
+    exit;
+}
+
+if (preg_match('/\s/', $rawUsername)) {
+    http_response_code(400);
+    echo json_encode([
+        "available" => false,
+        "field" => "username",
+        "message" => "Username cannot contain spaces."
     ]);
     exit;
 }
@@ -35,6 +42,10 @@ if (strlen($username) < 3 || strlen($username) > 30 || !preg_match('/^[a-zA-Z0-9
     ]);
     exit;
 }
+
+ob_start();
+include_once 'db.php';
+ob_clean();
 
 if (!isset($conn) || !($conn instanceof mysqli)) {
     error_log("[check_username] Database connection unavailable.");

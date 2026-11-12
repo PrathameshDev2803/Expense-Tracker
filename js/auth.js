@@ -132,8 +132,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Validation Logic ---
     async function checkUsername() {
         if (!usernameInput) return;
-        const username = usernameInput.value.trim();
+        const rawUsername = usernameInput.value;
+        const username = rawUsername.trim();
         if (!username) {
+            validity.username = false;
+            return;
+        }
+
+        if (/\s/.test(rawUsername)) {
+            showFieldError('username', 'Username cannot contain spaces');
             validity.username = false;
             return;
         }
@@ -258,7 +265,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (usernameInput) {
         usernameInput.addEventListener('blur', checkUsername);
         usernameInput.addEventListener('input', () => {
-            if (usernameInput.classList.contains('invalid')) {
+            if (/\s/.test(usernameInput.value)) {
+                showFieldError('username', 'Username cannot contain spaces');
+                validity.username = false;
+            } else if (usernameInput.classList.contains('invalid')) {
                 usernameInput.classList.remove('invalid');
                 const err = document.getElementById('username-error');
                 if (err) err.style.display = 'none';

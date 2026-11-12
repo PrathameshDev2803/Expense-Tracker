@@ -1,9 +1,11 @@
 <?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 // Disable error display to prevent HTML from breaking JSON
 ini_set('display_errors', 0);
 
-include 'db.php';
-session_start();
+include_once __DIR__ . '/db.php';
 
 header('Content-Type: application/json');
 

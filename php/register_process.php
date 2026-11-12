@@ -63,7 +63,8 @@ if (!AuthUtils::checkRateLimit($conn, $ip_address, 'register', 5, 60)) {
 }
 
 // 4. Safe Input Reading & Sanitization
-$username = isset($_POST['username']) ? trim((string)$_POST['username']) : '';
+$rawUsername = isset($_POST['username']) ? (string)$_POST['username'] : '';
+$username = trim($rawUsername);
 $email = isset($_POST['email']) ? trim((string)$_POST['email']) : '';
 $password = isset($_POST['password']) ? (string)$_POST['password'] : '';
 $confirm_password = isset($_POST['confirm_password']) ? (string)$_POST['confirm_password'] : '';
@@ -76,6 +77,18 @@ if ($username === '' || $email === '' || $password === '' || $confirm_password =
         "success" => false,
         "field" => "general",
         "message" => "All fields are required."
+    ]);
+    exit;
+}
+
+// Check whitespace in username
+if (preg_match('/\s/', $rawUsername)) {
+    logRegistrationFailure('Validation Error', 'Username contains spaces');
+    http_response_code(400);
+    echo json_encode([
+        "success" => false,
+        "field" => "username",
+        "message" => "Username cannot contain spaces."
     ]);
     exit;
 }
@@ -214,6 +227,9 @@ if ($insert_stmt->execute()) {
     // Authenticated session creation
     $_SESSION['user_id'] = $new_user_id;
     $_SESSION['username'] = $username;
+    $_SESSION['currency'] = 'INR';
+    $_SESSION['theme'] = 'light';
+    $_SESSION['currency_symbol'] = '₹';
 
     // Clear old flash or stale input
     unset($_SESSION['flash_error'], $_SESSION['old_input']);

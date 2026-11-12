@@ -1,6 +1,5 @@
 <?php
-include 'php/auth_check.php';
-include_once 'php/db.php';
+include_once __DIR__ . '/php/auth_check.php';
 ?>
 
 
