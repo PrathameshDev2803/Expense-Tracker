@@ -1,5 +1,4 @@
 <?php
-// Live Deploy Verification Test - Timestamp: 2026-11-13 00:31
 include_once __DIR__ . '/php/auth_check.php';
 ?>
 
@@ -24,38 +23,47 @@ include_once __DIR__ . '/php/auth_check.php';
       <div class="genre-card" data-genre="Business">
         <img src="images/business.png" alt="Business" />
         <span>Business</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Freelancing">
         <img src="images/freelancing.png" alt="Freelancing" />
         <span>Freelancing</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Investments">
         <img src="images/investments.png" alt="Investments" />
         <span>Investments</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Rental Income">
         <img src="images/rental.png" alt="Rental Income" />
         <span>Rental Income</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Side Hustles">
         <img src="images/side hustles.png" alt="Side Hustles" />
         <span>Side Hustles</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Dividend">
         <img src="images/dividend.png" alt="Dividend" />
         <span>Dividend</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Intrest Income">
         <img src="images/intrest income.png" alt="Intrest Income" />
         <span>Intrest Income</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Pension">
         <img src="images/pension.png" alt="Pension" />
         <span>Pension</span>
+        <div class="checkmark">✔</div>
       </div>
       <div class="genre-card" data-genre="Digital Assets">
         <img src="images/digital assets.png" alt="Digital Assets" />
         <span>Digital Assets</span>
+        <div class="checkmark">✔</div>
       </div>
       <!-- Custom Genre Section (Full Width) -->
       <div class="custom-genre-section" style="grid-column: 1 / -1; width: 100%; display: flex; flex-direction: column; align-items: center; margin-top: 20px; padding: 10px;">
