@@ -1,45 +1,32 @@
 <?php
 /**
  * Direct FTPS/FTP deployment script for InfinityFree / Shared Hosting.
- * Uses native PHP ftp_* extensions with automatic directory creation and SSL fallback.
+ * Automatically discovers all active document roots (including custom domain roots
+ * like myexp.prathameshjadhav.com/htdocs and default htdocs) and synchronizes project files.
  */
 
 $host = getenv('FTP_HOST') ?: '';
 $user = getenv('FTP_USERNAME') ?: '';
 $pass = getenv('FTP_PASSWORD') ?: '';
-$remoteDir = getenv('FTP_REMOTE_DIR') ?: '';
+$remoteDirEnv = getenv('FTP_REMOTE_DIR') ?: '';
 
 if (empty($host) || empty($user) || empty($pass)) {
     echo "::error::Missing FTP credentials. Deployment aborted.\n";
     exit(1);
 }
 
-// Normalize remote dir
-$remoteDir = trim(str_replace('\\', '/', $remoteDir));
-if ($remoteDir === '' || $remoteDir === '/') {
-    $remoteDir = 'htdocs/';
-}
-if (!str_ends_with($remoteDir, '/')) {
-    $remoteDir .= '/';
-}
-if (str_starts_with($remoteDir, '/')) {
-    $remoteDir = ltrim($remoteDir, '/');
-}
-
-echo "=== Starting FTP Deployment ===\n";
+echo "=== Starting Multi-Target FTP Deployment ===\n";
 echo "Host: {$host}\n";
 echo "User: {$user}\n";
-echo "Configured Target Directory: {$remoteDir}\n\n";
+echo "Configured Target Hint: {$remoteDirEnv}\n\n";
 
-// Connect (try FTPS first, then plain FTP)
+// Connect (try FTPS first, fallback to standard FTP)
 $conn = false;
-$isSsl = false;
 if (function_exists('ftp_ssl_connect')) {
-    echo "Attempting secure FTPS connection...\n";
+    echo "Attempting FTPS connection...\n";
     $conn = @ftp_ssl_connect($host, 21, 30);
     if ($conn) {
-        $isSsl = true;
-        echo "Connected via FTPS (control channel encrypted).\n";
+        echo "✓ Connected via FTPS.\n";
     }
 }
 
@@ -56,48 +43,66 @@ if (!$conn) {
 echo "Authenticating...\n";
 $login = @ftp_login($conn, $user, $pass);
 if (!$login) {
-    echo "::error::FTP authentication failed for user '{$user}'. Check INFINITYFREE_FTP_PASSWORD.\n";
+    echo "::error::FTP authentication failed for user '{$user}'. Check credentials.\n";
     ftp_close($conn);
     exit(1);
 }
 echo "✓ Authenticated successfully.\n";
 
-// Turn on passive mode
+// Passive mode
 ftp_pasv($conn, true);
 
 // Discover root listing
 echo "\n--- Remote Root Listing ---\n";
+ftp_chdir($conn, '/');
 $rootList = @ftp_nlist($conn, '.') ?: [];
 foreach ($rootList as $item) {
     echo "  - {$item}\n";
 }
 echo "---------------------------\n\n";
 
-// Validate / navigate to target directory
-$targetDir = $remoteDir;
-if (!@ftp_chdir($conn, '/' . $targetDir)) {
-    if (!@ftp_chdir($conn, $targetDir)) {
-        echo "Warning: Target '{$targetDir}' could not be chdir'd directly.\n";
-        // Check if rootList contains domain directory or htdocs
-        $domainDir = 'myexp.prathameshjadhav.com/htdocs/';
-        if (@ftp_chdir($conn, '/' . $domainDir) || @ftp_chdir($conn, $domainDir)) {
-            echo "✓ Found and switched to domain document root: {$domainDir}\n";
-            $targetDir = $domainDir;
-        } elseif (@ftp_chdir($conn, '/htdocs') || @ftp_chdir($conn, 'htdocs')) {
-            echo "✓ Found and switched to default root: htdocs/\n";
-            $targetDir = 'htdocs/';
-        } else {
-            echo "::error::Could not find or enter document root directory.\n";
-            ftp_close($conn);
-            exit(1);
+// Discover all viable document roots
+$targetCandidates = [];
+
+// 1. Explicit domain folder if present
+$domainCandidate = 'myexp.prathameshjadhav.com/htdocs';
+ftp_chdir($conn, '/');
+if (@ftp_chdir($conn, '/' . $domainCandidate) || @ftp_chdir($conn, $domainCandidate)) {
+    $targetCandidates[] = $domainCandidate;
+}
+
+// 2. User configured directory from secret/env
+if (!empty($remoteDirEnv)) {
+    $cleaned = trim(str_replace('\\', '/', $remoteDirEnv), '/');
+    if ($cleaned !== '' && !in_array($cleaned, $targetCandidates, true)) {
+        ftp_chdir($conn, '/');
+        if (@ftp_chdir($conn, '/' . $cleaned) || @ftp_chdir($conn, $cleaned)) {
+            $targetCandidates[] = $cleaned;
         }
     }
 }
 
-$currentDir = ftp_pwd($conn);
-echo "Current working directory on remote server: {$currentDir}\n\n";
+// 3. Default htdocs root
+if (!in_array('htdocs', $targetCandidates, true)) {
+    ftp_chdir($conn, '/');
+    if (@ftp_chdir($conn, '/htdocs') || @ftp_chdir($conn, 'htdocs')) {
+        $targetCandidates[] = 'htdocs';
+    }
+}
 
-// Files to deploy
+if (empty($targetCandidates)) {
+    echo "::error::No document root (htdocs or domain directory) could be accessed on remote server.\n";
+    ftp_close($conn);
+    exit(1);
+}
+
+echo "Active deployment targets found:\n";
+foreach ($targetCandidates as $t) {
+    echo "  -> /{$t}\n";
+}
+echo "\n";
+
+// Collect project files
 $rootDir = dirname(__DIR__);
 $excludedPatterns = [
     '^\.git',
@@ -128,7 +133,6 @@ foreach ($iterator as $item) {
     }
     $relPath = str_replace('\\', '/', substr($item->getPathname(), strlen($rootDir) + 1));
     
-    // Check exclusions
     $excluded = false;
     foreach ($excludedPatterns as $pattern) {
         if (preg_match('/' . $pattern . '/i', $relPath)) {
@@ -141,12 +145,12 @@ foreach ($iterator as $item) {
     }
 }
 
-echo "Found " . count($filesToUpload) . " project files to sync.\n";
+echo "Found " . count($filesToUpload) . " project files to synchronize.\n\n";
 
-// Helper to ensure remote directory exists
-function ensureRemoteDir($conn, string $remotePath): void {
-    $parts = explode('/', trim($remotePath, '/'));
-    $current = '';
+function ensureSubDir($conn, string $baseDir, string $subDir): void {
+    if ($subDir === '' || $subDir === '.' || $subDir === '/') return;
+    $parts = explode('/', trim(str_replace('\\', '/', $subDir), '/'));
+    $current = rtrim($baseDir, '/');
     foreach ($parts as $part) {
         if ($part === '') continue;
         $current .= '/' . $part;
@@ -154,41 +158,59 @@ function ensureRemoteDir($conn, string $remotePath): void {
             @ftp_mkdir($conn, $current);
         }
     }
+    @ftp_chdir($conn, $baseDir);
 }
 
-$uploadedCount = 0;
-$failCount = 0;
+$grandUploaded = 0;
+$grandFailed = 0;
 
-foreach ($filesToUpload as $file) {
-    $localPath = $rootDir . '/' . $file;
-    $remoteFilePath = $currentDir . '/' . $file;
-    $remoteFileDir = dirname($remoteFilePath);
-
-    ensureRemoteDir($conn, $remoteFileDir);
-    @ftp_chdir($conn, $currentDir);
-
-    // Upload file
-    $mode = FTP_BINARY;
-    if (@ftp_put($conn, $remoteFilePath, $localPath, $mode)) {
-        $size = filesize($localPath);
-        echo "✓ Uploaded: {$file} ({$size} bytes)\n";
-        $uploadedCount++;
-    } else {
-        echo "✗ Failed to upload: {$file}\n";
-        $failCount++;
+foreach ($targetCandidates as $target) {
+    $targetPath = '/' . trim($target, '/');
+    ftp_chdir($conn, '/');
+    if (!@ftp_chdir($conn, $targetPath) && !@ftp_chdir($conn, trim($target, '/'))) {
+        echo "Warning: Could not switch into {$targetPath}, skipping.\n";
+        continue;
     }
+    
+    $baseWorkingDir = ftp_pwd($conn);
+    echo "--- Deploying to: {$baseWorkingDir} ---\n";
+    $targetUploaded = 0;
+    $targetFailed = 0;
+
+    foreach ($filesToUpload as $file) {
+        $localPath = $rootDir . '/' . $file;
+        $fileSubDir = dirname($file);
+
+        if ($fileSubDir !== '.' && $fileSubDir !== '') {
+            ensureSubDir($conn, $baseWorkingDir, $fileSubDir);
+        }
+        @ftp_chdir($conn, $baseWorkingDir);
+
+        if (@ftp_put($conn, $file, $localPath, FTP_BINARY)) {
+            $size = filesize($localPath);
+            echo "  ✓ {$file} ({$size} B)\n";
+            $targetUploaded++;
+        } else {
+            echo "  ✗ Failed: {$file}\n";
+            $targetFailed++;
+        }
+    }
+
+    echo "Completed {$targetPath}: {$targetUploaded} uploaded, {$targetFailed} failed.\n\n";
+    $grandUploaded += $targetUploaded;
+    $grandFailed += $targetFailed;
 }
 
 ftp_close($conn);
 
-echo "\n=== Deployment Summary ===\n";
-echo "Successfully uploaded: {$uploadedCount} files\n";
-echo "Failed: {$failCount} files\n";
+echo "=== Overall Deployment Summary ===\n";
+echo "Total uploads: {$grandUploaded}\n";
+echo "Total failures: {$grandFailed}\n";
 
-if ($failCount > 0) {
+if ($grandFailed > 0) {
     echo "::error::Some files failed to upload.\n";
     exit(1);
 }
 
-echo "✓ Deployment complete! All changes are live on InfinityFree.\n";
+echo "✓ All active document roots are successfully synchronized with latest code!\n";
 exit(0);
