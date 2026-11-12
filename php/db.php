@@ -76,6 +76,12 @@ if ($rawAppEnv === null || trim($rawAppEnv) === '') {
 }
 
 $appEnv = strtolower(trim($rawAppEnv));
+if ($appEnv === 'local' || $appEnv === 'dev') {
+    $appEnv = 'development';
+} elseif ($appEnv === 'prod' || $appEnv === 'production') {
+    $appEnv = 'live';
+}
+
 if ($appEnv !== 'development' && $appEnv !== 'live') {
     error_log("Database configuration error: Invalid APP_ENV '{$rawAppEnv}'. Allowed values are 'development' or 'live'.");
     die('A system error occurred. Please try again later.');

@@ -96,7 +96,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             if(isset($_SESSION['flash_error'])) unset($_SESSION['flash_error']);
             if(isset($_SESSION['old_input'])) unset($_SESSION['old_input']);
             
-            echo json_encode(["success" => true, "redirect" => "../menu.php"]);
+            echo json_encode(["success" => true, "redirect" => "menu.php"]);
         } else {
              error_log("Registration DB Error: " . $insert_stmt->error);
              http_response_code(500);
