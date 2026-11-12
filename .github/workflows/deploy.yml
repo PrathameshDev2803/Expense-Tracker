@@ -1,0 +1,55 @@
+name: Deploy Expense Tracker to InfinityFree
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate-and-deploy:
+    name: CI Validation & Deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, mysqli, pdo, json
+          tools: composer:v2
+
+      - name: Validate composer.json
+        run: composer validate --no-check-publish
+
+      - name: Install Composer dependencies
+        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-progress
+
+      - name: Run PHP syntax checks
+        run: |
+          find . -type f -name "*.php" ! -path "./vendor/*" ! -path "./.github/*" -exec php -l {} \;
+
+      - name: Deploy via FTPS to InfinityFree
+        uses: airvzxf/ftp-deployment-action@v4.0.1
+        with:
+          server: "ftp://${{ secrets.INFINITYFREE_FTP_HOST }}:21"
+          user: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
+          password: ${{ secrets.INFINITYFREE_FTP_PASSWORD }}
+          local_dir: "."
+          remote_dir: ${{ secrets.INFINITYFREE_FTP_REMOTE_DIR }}
+          delete: "false"
+          ftp_ssl_allow: "true"
+          ssl_verify_certificate: "false"
+          lftp_settings: "set ftp:ssl-force true; set ftp:ssl-protect-data true;"
+          exclude: ".env*, .git*, .github*, .vscode*, node_modules*, README.md, sql*, inht-backup*, *.log, *.sql, tests*, test*"
+
