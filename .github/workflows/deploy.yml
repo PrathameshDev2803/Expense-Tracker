@@ -85,31 +85,42 @@ jobs:
             echo "FTP deployment skipped. Missing secrets: ${missing[*]}"
           fi
 
-      - name: Deploy website using explicit FTPS
+      - name: Deploy website using LFTP
         if: steps.check_ftp.outputs.has_ftp == 'true'
-        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
-        with:
-          server: ${{ secrets.INFINITYFREE_FTP_HOST }}
-          username: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
-          password: ${{ secrets.INFINITYFREE_FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
-          security: strict
-          local-dir: ./
-          server-dir: ${{ steps.check_ftp.outputs.remote_dir }}
-          dangerous-clean-slate: false
-          timeout: 60000
-          log-level: standard
-          exclude: |
-            **/.env*
-            **/.git*
-            **/.github/**
-            **/.vscode/**
-            **/node_modules/**
-            **/README.md
-            **/sql/**
-            **/*.sql
-            **/*.log
-            **/inht-backup/**
-            **/tests/**
-            **/test/**
+        env:
+          FTP_HOST: ${{ secrets.INFINITYFREE_FTP_HOST }}
+          FTP_USERNAME: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.INFINITYFREE_FTP_PASSWORD }}
+          REMOTE_DIR: ${{ steps.check_ftp.outputs.remote_dir }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq && sudo apt-get install -y -qq lftp
+          echo "Starting LFTP upload to ${REMOTE_DIR} on ${FTP_HOST}..."
+          lftp -e "
+            set ftp:ssl-allow true;
+            set ssl:verify-certificate false;
+            set ftp:ssl-protect-data false;
+            set ftp:passive-mode true;
+            set net:timeout 60;
+            set net:max-retries 3;
+            open -u \"$FTP_USERNAME\",\"$FTP_PASSWORD\" \"$FTP_HOST\";
+            pwd;
+            ls;
+            mirror --reverse --delete=false --verbose=1 \
+              --exclude-glob \".git*\" \
+              --exclude-glob \".github/**\" \
+              --exclude-glob \".vscode/**\" \
+              --exclude-glob \".env*\" \
+              --exclude-glob \"vendor/**\" \
+              --exclude-glob \"tests/**\" \
+              --exclude-glob \"test/**\" \
+              --exclude-glob \"scratch/**\" \
+              --exclude-glob \"node_modules/**\" \
+              --exclude-glob \"*.sql\" \
+              --exclude-glob \"*.log\" \
+              --exclude-glob \"inht-backup/**\" \
+              --exclude \"README.md\" \
+              ./ \"$REMOTE_DIR\";
+            bye
+          "
