@@ -1,4 +1,4 @@
-name: Deploy Expense Tracker to InfinityFree
+name: CI and Deploy Expense Tracker
 
 on:
   push:
@@ -6,50 +6,105 @@ on:
       - master
   workflow_dispatch:
 
-concurrency:
-  group: production-deployment
-  cancel-in-progress: false
-
 permissions:
   contents: read
 
+concurrency:
+  group: expense-tracker-production
+  cancel-in-progress: false
+
 jobs:
   validate-and-deploy:
-    name: CI Validation & Deployment
+    name: Validate PHP and optionally deploy
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - name: Set up PHP 8.3
+      - name: Set up PHP 8.3 and Composer
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.3'
           extensions: mbstring, mysqli, pdo, json
           tools: composer:v2
+          coverage: none
 
-      - name: Validate composer.json
-        run: composer validate --no-check-publish
+      - name: Validate Composer configuration
+        run: composer validate --no-check-publish --no-interaction
 
-      - name: Install Composer dependencies
-        run: composer install --no-dev --prefer-dist --optimize-autoloader --no-progress
+      - name: Install production Composer dependencies
+        run: composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Verify real environment files are not tracked
+        shell: bash
+        run: |
+          set -euo pipefail
+          tracked_env_files="$(git ls-files | grep -E '(^|/)\.env(\.|$)' | grep -v -E '(^|/)\.env\.example$' || true)"
+          if [[ -n "$tracked_env_files" ]]; then
+            echo "::error::A real environment file is tracked by Git. Remove it from the repository and rotate any exposed credentials."
+            printf '%s\n' "$tracked_env_files"
+            exit 1
+          fi
 
       - name: Run PHP syntax checks
+        shell: bash
         run: |
-          find . -type f -name "*.php" ! -path "./vendor/*" ! -path "./.github/*" -exec php -l {} \;
+          set -euo pipefail
+          find . -type f -name '*.php' \
+            ! -path './vendor/*' \
+            ! -path './.git/*' \
+            ! -path './.github/*' \
+            -print0 | xargs -0 -r -n1 php -l
 
-      - name: Deploy via FTPS to InfinityFree
-        uses: airvzxf/ftp-deployment-action@v4.0.1
+      - name: Skip production upload until FTP configuration is enabled
+        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED != 'true' }}
+        run: |
+          echo "PHP validation passed."
+          echo "Production upload is disabled. Add the InfinityFree FTP secrets and set the INFINITYFREE_DEPLOY_ENABLED repository variable to true when the custom-domain document root is confirmed."
+
+      - name: Verify required FTP settings
+        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'true' }}
+        env:
+          FTP_HOST: ${{ secrets.INFINITYFREE_FTP_HOST }}
+          FTP_USERNAME: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
+          FTP_PASSWORD: ${{ secrets.INFINITYFREE_FTP_PASSWORD }}
+          FTP_REMOTE_DIR: ${{ secrets.INFINITYFREE_FTP_REMOTE_DIR }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "$FTP_HOST" ]] || { echo "::error::Missing INFINITYFREE_FTP_HOST secret"; exit 1; }
+          [[ -n "$FTP_USERNAME" ]] || { echo "::error::Missing INFINITYFREE_FTP_USERNAME secret"; exit 1; }
+          [[ -n "$FTP_PASSWORD" ]] || { echo "::error::Missing INFINITYFREE_FTP_PASSWORD secret"; exit 1; }
+          [[ -n "$FTP_REMOTE_DIR" ]] || { echo "::error::Missing INFINITYFREE_FTP_REMOTE_DIR secret"; exit 1; }
+          [[ "$FTP_REMOTE_DIR" == */ ]] || { echo "::error::INFINITYFREE_FTP_REMOTE_DIR must end with /"; exit 1; }
+
+      - name: Deploy website using explicit FTPS
+        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'true' }}
+        uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
-          server: "ftp://${{ secrets.INFINITYFREE_FTP_HOST }}:21"
-          user: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
+          server: ${{ secrets.INFINITYFREE_FTP_HOST }}
+          username: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
           password: ${{ secrets.INFINITYFREE_FTP_PASSWORD }}
-          local_dir: "."
-          remote_dir: ${{ secrets.INFINITYFREE_FTP_REMOTE_DIR }}
-          delete: "false"
-          ftp_ssl_allow: "true"
-          ssl_verify_certificate: "false"
-          lftp_settings: "set ftp:ssl-force true; set ftp:ssl-protect-data true;"
-          exclude: ".env*, .git*, .github*, .vscode*, node_modules*, README.md, sql*, inht-backup*, *.log, *.sql, tests*, test*"
-
+          protocol: ftps
+          port: 21
+          security: strict
+          local-dir: ./
+          server-dir: ${{ secrets.INFINITYFREE_FTP_REMOTE_DIR }}
+          dangerous-clean-slate: false
+          timeout: 60000
+          log-level: standard
+          exclude: |
+            **/.env*
+            **/.git*
+            **/.github/**
+            **/.vscode/**
+            **/node_modules/**
+            **/README.md
+            **/sql/**
+            **/*.sql
+            **/*.log
+            **/inht-backup/**
+            **/tests/**
+            **/test/**
