@@ -3,8 +3,8 @@ session_start();
 include 'php/db.php';
 
 if (isset($_SESSION["user_id"])) {
-    $id = $_SESSION["user_id"];
-    $check = $conn->query("SELECT id FROM users WHERE id = '$id'");
+    $id = (int)$_SESSION["user_id"];
+    $check = $conn->query("SELECT id FROM users WHERE id = $id");
     if ($check && $check->num_rows > 0) {
         header("Location: main.php");
         exit();
@@ -12,6 +12,15 @@ if (isset($_SESSION["user_id"])) {
         session_unset();
         session_destroy();
     }
+}
+
+// Compute application base path dynamically for root hosting (e.g. /htdocs/) or subdirectories (e.g. /expensetracker/)
+$scriptDir = str_replace('\\', '/', dirname($_SERVER['SCRIPT_NAME'] ?? ''));
+$basePath = rtrim($scriptDir, '/');
+if ($basePath === '') {
+    $basePath = '/';
+} else {
+    $basePath = $basePath . '/';
 }
 ?>
 <!DOCTYPE html>
@@ -21,7 +30,8 @@ if (isset($_SESSION["user_id"])) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Start Tracking - Expense Tracker</title>
   <meta name="description" content="Access your financial dashboard.">
-  <link rel="stylesheet" href="css/style.css" />
+  <meta name="app-base-path" content="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>">
+  <link rel="stylesheet" href="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>css/style.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -84,7 +94,7 @@ if (isset($_SESSION["user_id"])) {
             <p>Access your personal financial dashboard.</p>
           </header>
 
-          <form id="register-form" class="product-form">
+          <form id="register-form" class="product-form" action="javascript:void(0);" method="POST" novalidate>
             <div class="module-group">
               <label for="username">Username</label>
               <input type="text" id="username" name="username" required autocomplete="username" />
@@ -136,6 +146,7 @@ if (isset($_SESSION["user_id"])) {
 
   <div id="toast-container" class="toast-container"></div>
 
-  <script src="js/auth.js"></script>
+  <script>window.APP_BASE_PATH = <?php echo json_encode($basePath); ?>;</script>
+  <script src="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>js/auth.js"></script>
 </body>
 </html>

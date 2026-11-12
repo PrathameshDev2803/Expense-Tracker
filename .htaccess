@@ -39,4 +39,10 @@ Options -Indexes
 
     # Deny direct HTTP access to vendor directory
     RewriteRule ^vendor(/.*)?$ - [F,L,NC]
+
+    # Allow extensionless access to existing PHP scripts (e.g. /register -> register.php)
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME}.php -f
+    RewriteRule ^(.*)$ $1.php [L,QSA]
 </IfModule>

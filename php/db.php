@@ -68,11 +68,26 @@ $getEnvVar = function (string $key): ?string {
     return null;
 };
 
+// Helper to safely terminate with consistent error formatting (JSON for APIs, text for pages)
+$terminateDbError = function (string $logMsg, string $userMsg = 'A system error occurred. Please try again later.'): void {
+    error_log($logMsg);
+    http_response_code(500);
+    $script = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+    $isJson = (isset($_SERVER['HTTP_ACCEPT']) && str_contains($_SERVER['HTTP_ACCEPT'], 'application/json')) ||
+              (isset($_SERVER['CONTENT_TYPE']) && str_contains($_SERVER['CONTENT_TYPE'], 'application/json')) ||
+              str_contains($script, '/php/');
+    if ($isJson && !headers_sent()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(["success" => false, "message" => $userMsg]);
+        exit;
+    }
+    die($userMsg);
+};
+
 // Validate APP_ENV
 $rawAppEnv = $getEnvVar('APP_ENV');
 if ($rawAppEnv === null || trim($rawAppEnv) === '') {
-    error_log('Database configuration error: APP_ENV is not set in environment or .env file.');
-    die('A system error occurred. Please try again later.');
+    $terminateDbError('Database configuration error: APP_ENV is not set in environment or .env file.');
 }
 
 $appEnv = strtolower(trim($rawAppEnv));
@@ -83,8 +98,7 @@ if ($appEnv === 'local' || $appEnv === 'dev') {
 }
 
 if ($appEnv !== 'development' && $appEnv !== 'live') {
-    error_log("Database configuration error: Invalid APP_ENV '{$rawAppEnv}'. Allowed values are 'development' or 'live'.");
-    die('A system error occurred. Please try again later.');
+    $terminateDbError("Database configuration error: Invalid APP_ENV '{$rawAppEnv}'. Allowed values are 'development' or 'live'.");
 }
 
 // Select database credentials based on APP_ENV
@@ -118,8 +132,7 @@ if ($dbPass === null || ($appEnv === 'live' && trim($dbPass) === '')) {
 }
 
 if (!empty($missingVars)) {
-    error_log("Database configuration error: Missing required environment variable(s) [" . implode(', ', $missingVars) . "] for environment '{$appEnv}'.");
-    die('A system error occurred. Please try again later.');
+    $terminateDbError("Database configuration error: Missing required environment variable(s) [" . implode(', ', $missingVars) . "] for environment '{$appEnv}'.");
 }
 
 $dbPort = (!empty($dbPortRaw) && is_numeric($dbPortRaw)) ? (int)$dbPortRaw : 3306;
@@ -130,8 +143,7 @@ mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
 try {
     $conn = new mysqli($dbHost, $dbUser, $dbPass, $dbName, $dbPort);
 } catch (Throwable $e) {
-    error_log("Database connection failed [{$appEnv}]: " . $e->getMessage());
-    die('A system error occurred. Please try again later.');
+    $terminateDbError("Database connection failed [{$appEnv}]: " . $e->getMessage());
 }
 
 // Set charset to utf8mb4
