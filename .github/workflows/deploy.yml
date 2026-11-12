@@ -58,14 +58,13 @@ jobs:
             ! -path './.github/*' \
             -print0 | xargs -0 -r -n1 php -l
 
-      - name: Skip production upload until FTP configuration is enabled
-        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED != 'true' }}
+      - name: Skip production upload when explicitly disabled
+        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'false' }}
         run: |
-          echo "PHP validation passed."
-          echo "Production upload is disabled. Add the InfinityFree FTP secrets and set the INFINITYFREE_DEPLOY_ENABLED repository variable to true when the custom-domain document root is confirmed."
+          echo "Production upload is disabled (INFINITYFREE_DEPLOY_ENABLED is false)."
 
       - name: Verify required FTP settings
-        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'true' }}
+        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED != 'false' }}
         env:
           FTP_HOST: ${{ secrets.INFINITYFREE_FTP_HOST }}
           FTP_USERNAME: ${{ secrets.INFINITYFREE_FTP_USERNAME }}
@@ -81,7 +80,7 @@ jobs:
           [[ "$FTP_REMOTE_DIR" == */ ]] || { echo "::error::INFINITYFREE_FTP_REMOTE_DIR must end with /"; exit 1; }
 
       - name: Deploy website using explicit FTPS
-        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED == 'true' }}
+        if: ${{ vars.INFINITYFREE_DEPLOY_ENABLED != 'false' }}
         uses: SamKirkland/FTP-Deploy-Action@110f9186c050f71550953127052e77650219c287 # v4.4.0
         with:
           server: ${{ secrets.INFINITYFREE_FTP_HOST }}
