@@ -1,4 +1,5 @@
 <?php
+// Live Deploy Verification Test - Timestamp: 2026-11-13 00:31
 include_once __DIR__ . '/php/auth_check.php';
 ?>
 
