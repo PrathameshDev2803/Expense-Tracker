@@ -20,8 +20,8 @@ $notifs = json_decode($user_data['notification_prefs'] ?? '{}', true);
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings | ExpenseTracker</title>
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/settings.css">
+    <link rel="stylesheet" href="<?= asset('css/main.css') ?>">
+    <link rel="stylesheet" href="<?= asset('css/settings.css') ?>">
 </head>
 <body>
     <?php include 'php/header.php'; ?>
@@ -219,6 +219,6 @@ $notifs = json_decode($user_data['notification_prefs'] ?? '{}', true);
         </div>
     </main>
 
-    <script src="js/settings.js"></script>
+    <script src="<?= asset('js/settings.js') ?>"></script>
 </body>
 </html>

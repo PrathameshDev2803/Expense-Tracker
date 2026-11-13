@@ -11,8 +11,8 @@ include 'php/setup_goals.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Savings Goals | ExpenseTracker</title>
-    <link rel="stylesheet" href="css/main.css">
-    <link rel="stylesheet" href="css/goals.css">
+    <link rel="stylesheet" href="<?= asset('css/main.css') ?>">
+    <link rel="stylesheet" href="<?= asset('css/goals.css') ?>">
 </head>
 <body>
     <?php include 'php/header.php'; ?>

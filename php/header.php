@@ -3,10 +3,11 @@
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
+require_once __DIR__ . '/asset_helper.php';
 $current_page = basename($_SERVER['PHP_SELF']);
 ?>
 <!-- Include Header CSS -->
-<link rel="stylesheet" href="css/header.css">
+<link rel="stylesheet" href="<?= asset('css/header.css') ?>">
 
 <header class="app-header">
   <div class="header-left">

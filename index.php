@@ -1,3 +1,6 @@
+<?php
+require_once __DIR__ . '/php/asset_helper.php';
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/start.css" />
+  <link rel="stylesheet" href="<?= asset('css/start.css') ?>" />
 </head>
 <body>
   <main class="hero-container">

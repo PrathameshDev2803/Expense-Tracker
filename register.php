@@ -31,7 +31,7 @@ if ($basePath === '') {
   <title>Start Tracking - Expense Tracker</title>
   <meta name="description" content="Access your financial dashboard.">
   <meta name="app-base-path" content="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>">
-  <link rel="stylesheet" href="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>css/style.css" />
+  <link rel="stylesheet" href="<?php echo htmlspecialchars($basePath . asset('css/style.css'), ENT_QUOTES, 'UTF-8'); ?>" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -147,6 +147,6 @@ if ($basePath === '') {
   <div id="toast-container" class="toast-container"></div>
 
   <script>window.APP_BASE_PATH = <?php echo json_encode($basePath); ?>;</script>
-  <script src="<?php echo htmlspecialchars($basePath, ENT_QUOTES, 'UTF-8'); ?>js/auth.js"></script>
+  <script src="<?php echo htmlspecialchars($basePath . asset('js/auth.js'), ENT_QUOTES, 'UTF-8'); ?>"></script>
 </body>
 </html>

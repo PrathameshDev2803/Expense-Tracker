@@ -9,7 +9,7 @@ include_once 'php/db.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subscriptions</title>
-    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="<?= asset('css/main.css') ?>">
     <script>
     // Apply density preference immediately to prevent layout shift
     (function() {

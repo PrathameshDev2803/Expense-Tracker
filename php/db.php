@@ -2,6 +2,9 @@
 // Set timezone to Indian Standard Time (IST)
 date_default_timezone_set('Asia/Kolkata');
 
+// Load asset & cache management helper
+require_once __DIR__ . '/asset_helper.php';
+
 // Reuse existing MySQLi connection if already established
 if (isset($GLOBALS['conn']) && $GLOBALS['conn'] instanceof mysqli) {
     $conn = $GLOBALS['conn'];

@@ -4,6 +4,9 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Load asset & cache management helper
+require_once __DIR__ . '/asset_helper.php';
+
 if (!function_exists('get_currency_symbol')) {
     function get_currency_symbol($code) {
         $code = strtoupper((string)$code);
