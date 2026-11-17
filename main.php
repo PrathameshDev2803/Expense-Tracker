@@ -53,6 +53,7 @@ include 'php/get_analytics.php';
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <script>
+    window.CSRF_TOKEN = "<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>";
     // Apply density preference immediately to prevent layout shift
     (function() {
       const density = localStorage.getItem('navbarDensity');
@@ -2419,8 +2420,12 @@ include 'php/get_analytics.php';
 
         <!-- Collapsible Note -->
         <div class="qa-note-section">
-          <button type="button" id="toggleNoteBtn" class="qa-note-toggle">
-            <span class="qa-plus-icon">+</span> Add Note
+          <button type="button" id="toggleNoteBtn" class="qa-note-toggle add-note-btn" aria-label="Add Note">
+            <svg class="plus-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>Add Note</span>
           </button>
           <input type="text" id="desc" class="qa-note-field hidden" placeholder="What is this for?" autocomplete="off">
         </div>
@@ -3231,6 +3236,7 @@ include 'php/get_analytics.php';
       }
       const selectedDate = document.querySelector(".date-box.active")?.dataset.date;
       params.append("created_at", selectedDate);
+      params.append("csrf_token", window.CSRF_TOKEN || '');
 
       // Loading State
       const originalText = btnText.textContent;

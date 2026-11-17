@@ -219,6 +219,9 @@ $notifs = json_decode($user_data['notification_prefs'] ?? '{}', true);
         </div>
     </main>
 
+    <script>
+        window.CSRF_TOKEN = "<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>";
+    </script>
     <script src="<?= asset('js/settings.js') ?>"></script>
 </body>
 </html>

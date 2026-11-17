@@ -261,48 +261,50 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Input Event Listeners ---
-    if (usernameInput) {
-        usernameInput.addEventListener('blur', checkUsername);
-        usernameInput.addEventListener('input', () => {
-            if (/\s/.test(usernameInput.value)) {
-                showFieldError('username', 'Username cannot contain spaces');
-                validity.username = false;
-            } else if (usernameInput.classList.contains('invalid')) {
-                usernameInput.classList.remove('invalid');
-                const err = document.getElementById('username-error');
-                if (err) err.style.display = 'none';
-            }
-        });
-    }
+    // --- Input Event Listeners (Registration Form) ---
+    if (form) {
+        if (usernameInput) {
+            usernameInput.addEventListener('blur', checkUsername);
+            usernameInput.addEventListener('input', () => {
+                if (/\s/.test(usernameInput.value)) {
+                    showFieldError('username', 'Username cannot contain spaces');
+                    validity.username = false;
+                } else if (usernameInput.classList.contains('invalid')) {
+                    usernameInput.classList.remove('invalid');
+                    const err = document.getElementById('username-error');
+                    if (err) err.style.display = 'none';
+                }
+            });
+        }
 
-    if (emailInput) {
-        emailInput.addEventListener('blur', checkEmail);
-        emailInput.addEventListener('input', () => {
-            if (emailInput.classList.contains('invalid')) {
-                emailInput.classList.remove('invalid');
-                const err = document.getElementById('email-error');
-                if (err) err.style.display = 'none';
-            }
-        });
-    }
+        if (emailInput) {
+            emailInput.addEventListener('blur', checkEmail);
+            emailInput.addEventListener('input', () => {
+                if (emailInput.classList.contains('invalid')) {
+                    emailInput.classList.remove('invalid');
+                    const err = document.getElementById('email-error');
+                    if (err) err.style.display = 'none';
+                }
+            });
+        }
 
-    if (passwordInput) {
-        passwordInput.addEventListener('input', checkPasswordMatch);
-        passwordInput.addEventListener('blur', () => {
-            if (passwordInput.value.length > 0 && !validity.password) {
-                showFieldError('password', 'Password too weak (8+ chars, 1 Upper, 1 Special)');
-            }
-        });
-    }
+        if (passwordInput) {
+            passwordInput.addEventListener('input', checkPasswordMatch);
+            passwordInput.addEventListener('blur', () => {
+                if (passwordInput.value.length > 0 && !validity.password) {
+                    showFieldError('password', 'Password too weak (8+ chars, 1 Upper, 1 Special)');
+                }
+            });
+        }
 
-    if (confirmInput) {
-        confirmInput.addEventListener('input', checkPasswordMatch);
-        confirmInput.addEventListener('blur', () => {
-            if (confirmInput.value.length > 0 && !validity.confirm) {
-                showFieldError('confirm_password', 'Passwords do not match');
-            }
-        });
+        if (confirmInput) {
+            confirmInput.addEventListener('input', checkPasswordMatch);
+            confirmInput.addEventListener('blur', () => {
+                if (confirmInput.value.length > 0 && !validity.confirm) {
+                    showFieldError('confirm_password', 'Passwords do not match');
+                }
+            });
+        }
     }
 
     // --- Form Submission Workflow ---
@@ -448,6 +450,162 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error(`[API Diagnostic] Network fetch failure connecting to ${endpoint}:`, networkErr);
                 showToast("Connection failed. Please check your network connection and try again.");
                 restoreSubmitButton();
+                return false;
+            }
+        });
+    }
+
+    // --- Login Form Workflow ---
+    const loginForm = document.getElementById('login-form');
+    if (loginForm) {
+        const loginEmail = document.getElementById('email');
+        const loginPassword = document.getElementById('password');
+        const loginSubmitBtn = loginForm.querySelector('button[type="submit"]');
+        const alertBanner = document.getElementById('auth-alert-banner');
+        const alertText = document.getElementById('auth-alert-text');
+        let isLoginSubmitting = false;
+
+        function hideAlertBanner() {
+            if (alertBanner) {
+                alertBanner.style.display = 'none';
+            }
+        }
+
+        function showAlertBanner(msg) {
+            if (alertBanner && alertText) {
+                alertText.textContent = msg;
+                alertBanner.style.display = 'flex';
+                alertBanner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        if (loginEmail) {
+            loginEmail.addEventListener('input', () => {
+                if (loginEmail.classList.contains('invalid')) {
+                    clearFieldError('email');
+                }
+                hideAlertBanner();
+            });
+        }
+
+        if (loginPassword) {
+            loginPassword.addEventListener('input', () => {
+                if (loginPassword.classList.contains('invalid')) {
+                    clearFieldError('password');
+                }
+                hideAlertBanner();
+            });
+        }
+
+        loginForm.addEventListener('submit', async (e) => {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+
+            // Prevent duplicate submissions while in-flight
+            if (isLoginSubmitting) {
+                return false;
+            }
+
+            // Clear previous errors
+            hideAlertBanner();
+            clearFieldError('email');
+            clearFieldError('password');
+
+            const emailVal = loginEmail ? loginEmail.value.trim() : '';
+            const passwordVal = loginPassword ? loginPassword.value : '';
+
+            // Client-side validation: Empty email
+            if (!emailVal) {
+                showFieldError('email', 'Please enter your email address.');
+                loginEmail?.focus();
+                return false;
+            }
+
+            // Client-side validation: Invalid email format
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailVal)) {
+                showFieldError('email', 'Please enter a valid email address.');
+                loginEmail?.focus();
+                return false;
+            }
+
+            // Client-side validation: Empty password
+            if (!passwordVal) {
+                showFieldError('password', 'Please enter your password.');
+                loginPassword?.focus();
+                return false;
+            }
+
+            // Lock submission & show loading state
+            isLoginSubmitting = true;
+            if (loginSubmitBtn) {
+                loginSubmitBtn.disabled = true;
+                loginSubmitBtn.innerText = 'Logging in...';
+            }
+
+            const restoreButton = () => {
+                isLoginSubmitting = false;
+                if (loginSubmitBtn) {
+                    loginSubmitBtn.disabled = false;
+                    loginSubmitBtn.innerText = 'Log In';
+                }
+            };
+
+            const endpoint = resolveEndpoint('php/login_process.php');
+            const formData = new FormData(loginForm);
+
+            try {
+                const res = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    body: formData
+                });
+
+                const { ok, status, data, rawText } = await parseApiResponse(res, endpoint);
+
+                if (!data) {
+                    console.error(`[Login Diagnostic] Non-JSON response (HTTP ${status}) from ${endpoint}:`, rawText);
+                    showAlertBanner('A system error occurred. Please try again.');
+                    restoreButton();
+                    return false;
+                }
+
+                if (ok && data.success) {
+                    let redirectTarget = data.redirect || 'main.php';
+                    if (!redirectTarget.startsWith('http://') && !redirectTarget.startsWith('https://') && !redirectTarget.startsWith('/')) {
+                        redirectTarget = resolveEndpoint(redirectTarget);
+                    }
+                    window.location.href = redirectTarget;
+                    return true;
+                }
+
+                // Handle validation or authentication failure
+                restoreButton();
+
+                if (data.field === 'email') {
+                    showFieldError('email', data.message || 'Please enter a valid email address.');
+                    loginEmail?.focus();
+                } else if (data.field === 'password') {
+                    showFieldError('password', data.message || 'Please enter your password.');
+                    loginPassword?.focus();
+                } else {
+                    showAlertBanner(data.message || 'Invalid email or password. Please try again.');
+                    if (loginPassword) {
+                        loginPassword.value = '';
+                    }
+                    loginEmail?.focus();
+                }
+
+                return false;
+
+            } catch (networkErr) {
+                console.error(`[Login Diagnostic] Network fetch failure:`, networkErr);
+                showAlertBanner('Connection failed. Please check your network connection and try again.');
+                restoreButton();
                 return false;
             }
         });

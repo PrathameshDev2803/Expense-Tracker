@@ -2,6 +2,7 @@
 define('API_MODE', true);
 require 'auth_check.php';
 require 'db.php';
+require_once 'auth_utils.php';
 
 header('Content-Type: application/json');
 
@@ -15,6 +16,19 @@ $user_id = $_SESSION['user_id'];
 $response = ['success' => false];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!AuthUtils::verifyOrigin()) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Cross-origin request forbidden']);
+        exit;
+    }
+
+    $token = $_POST['csrf_token'] ?? $_SERVER['HTTP_X_CSRF_TOKEN'] ?? '';
+    if (!AuthUtils::verifyCsrfToken($token)) {
+        http_response_code(403);
+        echo json_encode(['success' => false, 'error' => 'Invalid or expired CSRF token']);
+        exit;
+    }
+
     $form_id = $_POST['form_id'] ?? '';
 
     if ($form_id === 'profileForm') {
@@ -84,13 +98,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Verify current password
-        $stmt = $conn->prepare("SELECT password FROM users WHERE id = ?");
+        $stmt = $conn->prepare("SELECT username, email, password FROM users WHERE id = ?");
         $stmt->bind_param("i", $user_id);
         $stmt->execute();
         $result = $stmt->get_result();
         $user = $result->fetch_assoc();
         
         if ($user && password_verify($current, $user['password'])) {
+            $validation = AuthUtils::validatePassword($new, $user['username'] ?? '', $user['email'] ?? '');
+            if ($validation !== true) {
+                echo json_encode(['success' => false, 'error' => $validation]);
+                exit;
+            }
+
             $new_hash = password_hash($new, PASSWORD_DEFAULT);
             $update = $conn->prepare("UPDATE users SET password = ? WHERE id = ?");
             $update->bind_param("si", $new_hash, $user_id);

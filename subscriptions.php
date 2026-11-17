@@ -1,6 +1,7 @@
 <?php
 include 'php/auth_check.php';
 include_once 'php/db.php';
+require_once 'php/setup_subscriptions.php';
 ?>
 
 <!DOCTYPE html>
@@ -564,6 +565,16 @@ include_once 'php/db.php';
     let isScanning = false;
 
     // Actions
+    function escapeHtml(text) {
+        if (text === null || text === undefined) return '';
+        return String(text)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
     async function loadSubscriptions() {
         const grid = document.getElementById('subsGrid');
         
@@ -619,10 +630,14 @@ include_once 'php/db.php';
                 card.className = `sub-card ${sub.status}`;
                 if(sub.status !== 'active') card.style.opacity = '0.5';
 
+                const safeMerchant = escapeHtml(sub.merchant_name);
+                const safeCycle = escapeHtml(sub.billing_cycle);
+                const safeStatus = escapeHtml(sub.status);
+
                 card.innerHTML = `
                     <div class="sub-card-header">
-                        <div class="merchant-name">${sub.merchant_name}</div>
-                        <div class="billing-badge">${sub.billing_cycle}</div>
+                        <div class="merchant-name">${safeMerchant}</div>
+                        <div class="billing-badge">${safeCycle}</div>
                     </div>
                     
                     <div class="sub-amount">${formatCurrency(sub.average_amount)}</div>
@@ -630,7 +645,7 @@ include_once 'php/db.php';
                     
                     <div class="sub-meta">
                         <div>Last Charged: ${formatDate(sub.last_charged_date)}</div>
-                        <div>Status: <span style="text-transform:capitalize; color: ${sub.status === 'active' ? '#10b981' : '#ef4444'}">${sub.status}</span></div>
+                        <div>Status: <span style="text-transform:capitalize; color: ${sub.status === 'active' ? '#10b981' : '#ef4444'}">${safeStatus}</span></div>
                     </div>
 
                     ${sub.status === 'active' ? `

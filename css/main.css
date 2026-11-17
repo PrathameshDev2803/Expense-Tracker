@@ -361,25 +361,97 @@ button:hover {
   display: flex;
   flex-direction: column;
   align-items: center;
+  margin-top: 10px;
+  margin-bottom: 6px;
 }
 
-.qa-note-toggle {
-  background: transparent;
+.qa-note-toggle,
+.add-note-btn {
+  background-color: #3B82F6;
   border: none;
-  color: #94a3b8;
-  font-size: 0.9rem;
+  color: #FFFFFF;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  padding: 8px;
-  transition: all 0.2s;
+  padding: 8px 16px;
+  border-radius: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  margin: 0;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.2);
+  transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  user-select: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
 
-.qa-note-toggle:hover {
-  color: #64748b;
+.qa-note-toggle svg,
+.add-note-btn svg {
+  width: 15px;
+  height: 15px;
+  stroke: #FFFFFF;
+  stroke-width: 2.5;
+  display: block;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.qa-note-toggle span,
+.add-note-btn span {
+  color: #FFFFFF;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1;
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  transform: translateY(0.5px);
+}
+
+.qa-note-toggle:hover,
+.add-note-btn:hover {
+  background-color: #2563EB !important;
+  color: #FFFFFF !important;
   transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}
+
+.qa-note-toggle:hover svg,
+.add-note-btn:hover svg {
+  stroke: #FFFFFF !important;
+}
+
+.qa-note-toggle:hover span,
+.add-note-btn:hover span {
+  color: #FFFFFF !important;
+}
+
+.qa-note-toggle:active,
+.add-note-btn:active {
+  background-color: #1D4ED8 !important;
+  color: #FFFFFF !important;
+  transform: scale(0.98);
+  box-shadow: 0 2px 6px rgba(29, 78, 216, 0.3);
+}
+
+.qa-note-toggle:active svg,
+.add-note-btn:active svg {
+  stroke: #FFFFFF !important;
+}
+
+.qa-note-toggle:active span,
+.add-note-btn:active span {
+  color: #FFFFFF !important;
+}
+
+.qa-note-toggle:focus-visible,
+.add-note-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25), 0 2px 8px rgba(37, 99, 235, 0.2);
 }
 
 .qa-plus-icon {

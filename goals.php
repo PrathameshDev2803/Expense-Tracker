@@ -671,6 +671,16 @@ include 'php/setup_goals.php';
                 });
             }
 
+            function escapeHtml(text) {
+                if (text === null || text === undefined) return '';
+                return String(text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+
             // Icons Map for Goal Types
             const goalIcons = {
                 'target': '<path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"/><path d="M12 6a6 6 0 1 0 6 6 6 6 0 0 0-6-6zm0 10a4 4 0 1 1 4-4 4 4 0 0 1-4 4z"/>',
@@ -708,13 +718,14 @@ include 'php/setup_goals.php';
                 const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: window.CURRENCY_CODE || 'INR', maximumFractionDigits: 0 });
                 const displayPercent = percent.toFixed(1).replace(/\.0$/, '');
                 const remaining = Math.max(0, target - saved);
+                const safeGoalName = escapeHtml(goal.goal_name);
 
                 return `
                 <div class="goal-card ${isCompleted ? 'completed' : ''}" data-state="${state}">
                     <div class="goal-header">
                         <div class="goal-header-left">
                             <div class="goal-icon">${iconSvg}</div>
-                            <div class="goal-title" title="${goal.goal_name}">${goal.goal_name}</div>
+                            <div class="goal-title" title="${safeGoalName}">${safeGoalName}</div>
                         </div>
                         <details class="goal-menu-dropdown">
                             <summary class="goal-menu-btn" aria-label="Goal options">
@@ -723,7 +734,7 @@ include 'php/setup_goals.php';
                             <div class="goal-menu-content">
                                 <button class="menu-item edit-goal-trigger" 
                                     data-id="${goal.goal_id}"
-                                    data-name="${goal.goal_name}"
+                                    data-name="${safeGoalName}"
                                     data-target="${goal.target_amount}"
                                     data-deadline="${goal.deadline}"
                                     data-icon="${goal.icon}">
@@ -761,7 +772,7 @@ include 'php/setup_goals.php';
                         ${!isCompleted ? `
                             <button class="action-btn-sm add-funds-trigger" 
                                 data-id="${goal.goal_id}" 
-                                data-name="${goal.goal_name}"
+                                data-name="${safeGoalName}"
                                 data-target="${goal.target_amount}"
                                 data-saved="${goal.saved_amount}"
                                 data-icon="${goal.icon}">

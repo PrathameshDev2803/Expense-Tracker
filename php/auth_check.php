@@ -59,8 +59,15 @@ if (!function_exists('attempt_cookie_login')) {
                             $update->close();
                         }
                         
-                        // Update cookie (30 days)
-                        setcookie("remember_me", $new_token, time() + (30 * 24 * 60 * 60), "/");
+                        // Update cookie (30 days) with secure attributes
+                        $isSecure = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (isset($_SERVER['SERVER_PORT']) && $_SERVER['SERVER_PORT'] == 443);
+                        setcookie("remember_me", $new_token, [
+                            'expires' => time() + (30 * 24 * 60 * 60),
+                            'path' => '/',
+                            'secure' => $isSecure,
+                            'httponly' => true,
+                            'samesite' => 'Lax'
+                        ]);
                         
                         $stmt->close();
                         return true;
@@ -83,6 +90,11 @@ if (!isset($_SESSION['user_id'])) {
 
 // Ensure default preferences exist in session
 if (isset($_SESSION['user_id'])) {
+    // Ensure anti-CSRF token exists for the active session
+    if (empty($_SESSION['csrf_token'])) {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+    }
+
     if (!isset($_SESSION['currency'])) {
         $_SESSION['currency'] = 'INR';
     }

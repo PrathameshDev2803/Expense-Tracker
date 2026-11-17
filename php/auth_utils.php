@@ -105,7 +105,39 @@ class AuthUtils {
     
     // Clear attempts on success
     public static function clearAttempts($conn, $ip, $type = 'login') {
-        // Enforce strict window
+        if (!$conn || !($conn instanceof mysqli)) {
+            return;
+        }
+        $stmt = $conn->prepare("DELETE FROM attempt_log WHERE ip_address = ? AND (attempt_type = ? OR attempt_type = 'login' OR attempt_type = 'login_fail')");
+        if ($stmt) {
+            $stmt->bind_param("ss", $ip, $type);
+            $stmt->execute();
+            $stmt->close();
+        }
+    }
+    // Verify CSRF Token
+    public static function verifyCsrfToken(?string $token): bool {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $sessionToken = $_SESSION['csrf_token'] ?? '';
+        if (empty($sessionToken) || empty($token)) {
+            return false;
+        }
+        return hash_equals($sessionToken, $token);
+    }
+
+    // Verify Request Origin
+    public static function verifyOrigin(): bool {
+        if (!empty($_SERVER['HTTP_ORIGIN'])) {
+            $originHost = parse_url($_SERVER['HTTP_ORIGIN'], PHP_URL_HOST);
+            $serverHost = $_SERVER['SERVER_NAME'] ?? $_SERVER['HTTP_HOST'] ?? '';
+            $serverHost = explode(':', $serverHost)[0];
+            if ($originHost && strcasecmp($originHost, $serverHost) !== 0 && $originHost !== 'localhost' && $originHost !== '127.0.0.1') {
+                return false;
+            }
+        }
+        return true;
     }
 }
 ?>

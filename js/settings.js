@@ -54,6 +54,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData(form);
             // Append form ID to identify action type
             formData.append('form_id', form.id);
+            if (window.CSRF_TOKEN) {
+                formData.append('csrf_token', window.CSRF_TOKEN);
+            }
 
             try {
                 const response = await fetch('php/api_settings.php', {
@@ -163,6 +166,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('form_id', 'appearanceForm'); // Virtual form
             formData.append('theme', theme);
+            if (window.CSRF_TOKEN) {
+                formData.append('csrf_token', window.CSRF_TOKEN);
+            }
 
             try {
                 await fetch('php/api_settings.php', { method: 'POST', body: formData });
@@ -184,6 +190,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const formData = new FormData();
             formData.append('form_id', 'notificationsForm'); // Virtual form
             formData.append('prefs', JSON.stringify(prefs));
+            if (window.CSRF_TOKEN) {
+                formData.append('csrf_token', window.CSRF_TOKEN);
+            }
 
             try {
                 const res = await fetch('php/api_settings.php', { method: 'POST', body: formData });

@@ -9,6 +9,7 @@ if (!isset($_SESSION['user_id'])) {
 }
 
 include 'db.php';
+require_once __DIR__ . '/setup_subscriptions.php';
 $user_id = $_SESSION['user_id'];
 
 $sql = "SELECT * FROM subscriptions WHERE user_id = ? AND status != 'ignored' ORDER BY average_amount DESC";
