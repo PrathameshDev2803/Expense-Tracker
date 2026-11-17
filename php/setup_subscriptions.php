@@ -14,20 +14,28 @@ $sqlSubscriptions = "CREATE TABLE IF NOT EXISTS subscriptions (
     status ENUM('active', 'canceled', 'ignored') DEFAULT 'active',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    INDEX idx_sub_user (user_id)
 )";
 
 $sqlTransactions = "CREATE TABLE IF NOT EXISTS subscription_transactions (
     subscription_id INT NOT NULL,
     transaction_id INT NOT NULL,
     PRIMARY KEY (subscription_id, transaction_id),
-    FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
-    FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
+    INDEX idx_sub_tx_sub (subscription_id),
+    INDEX idx_sub_tx_tx (transaction_id)
 )";
 
-if (!$conn->query($sqlSubscriptions)) {
-    error_log("Error creating subscriptions table: " . $conn->error);
+if ($conn->query($sqlSubscriptions)) {
+    try {
+        @$conn->query("ALTER TABLE subscriptions ADD CONSTRAINT fk_subscriptions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE");
+    } catch (Throwable $e) {}
 }
-if (!$conn->query($sqlTransactions)) {
-    error_log("Error creating subscription_transactions table: " . $conn->error);
+
+if ($conn->query($sqlTransactions)) {
+    try {
+        @$conn->query("ALTER TABLE subscription_transactions ADD CONSTRAINT fk_sub_trans_sub FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE");
+    } catch (Throwable $e) {}
+    try {
+        @$conn->query("ALTER TABLE subscription_transactions ADD CONSTRAINT fk_sub_trans_trans FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE");
+    } catch (Throwable $e) {}
 }

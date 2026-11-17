@@ -83,7 +83,7 @@ if ($isCli) {
     echo "--------------------------------------------------------\n";
 }
 
-// Migration queries
+// Migration queries designed for compatibility across all hosting environments
 $migrations = [
     'users' => "CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -94,21 +94,21 @@ $migrations = [
         theme VARCHAR(20) DEFAULT 'light',
         remember_token VARCHAR(255) NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    )",
 
     'income_genres' => "CREATE TABLE IF NOT EXISTS income_genres (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         category_name VARCHAR(100) NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        INDEX idx_income_user (user_id)
+    )",
 
     'expense_genres' => "CREATE TABLE IF NOT EXISTS expense_genres (
         id INT AUTO_INCREMENT PRIMARY KEY,
         user_id INT NOT NULL,
         category_name VARCHAR(100) NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        INDEX idx_expense_user (user_id)
+    )",
 
     'transactions' => "CREATE TABLE IF NOT EXISTS transactions (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -118,8 +118,8 @@ $migrations = [
         amount DECIMAL(10, 2) NOT NULL,
         description VARCHAR(255),
         created_at DATETIME NOT NULL,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        INDEX idx_tx_user (user_id)
+    )",
 
     'goals' => "CREATE TABLE IF NOT EXISTS goals (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -134,8 +134,8 @@ $migrations = [
         end_date DATE NULL,
         status ENUM('active', 'completed', 'failed') DEFAULT 'active',
         last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        INDEX idx_goals_user (user_id)
+    )",
 
     'savings_goals' => "CREATE TABLE IF NOT EXISTS savings_goals (
         goal_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -146,8 +146,9 @@ $migrations = [
         deadline DATE NULL,
         icon VARCHAR(50) NULL,
         status ENUM('active', 'completed', 'archived') DEFAULT 'active',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_savings_user (user_id)
+    )",
 
     'subscriptions' => "CREATE TABLE IF NOT EXISTS subscriptions (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -161,16 +162,16 @@ $migrations = [
         status ENUM('active', 'canceled', 'ignored') DEFAULT 'active',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        INDEX idx_sub_user (user_id)
+    )",
 
     'subscription_transactions' => "CREATE TABLE IF NOT EXISTS subscription_transactions (
         subscription_id INT NOT NULL,
         transaction_id INT NOT NULL,
         PRIMARY KEY (subscription_id, transaction_id),
-        FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
-        FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+        INDEX idx_sub_tx_sub (subscription_id),
+        INDEX idx_sub_tx_tx (transaction_id)
+    )",
 
     'attempt_log' => "CREATE TABLE IF NOT EXISTS attempt_log (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -178,7 +179,7 @@ $migrations = [
         action_type VARCHAR(50) NOT NULL,
         attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_ip_action_time (ip_address, action_type, attempt_time)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci",
+    )",
 ];
 
 $successCount = 0;
@@ -196,6 +197,25 @@ foreach ($migrations as $tableName => $sql) {
     } catch (Throwable $e) {
         renderMessage('error', "Table `$tableName`", $e->getMessage());
         $errorCount++;
+    }
+}
+
+// Attempt optional foreign key constraints if supported by the host's table engines
+$foreignKeys = [
+    "ALTER TABLE income_genres ADD CONSTRAINT fk_income_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE expense_genres ADD CONSTRAINT fk_expense_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE transactions ADD CONSTRAINT fk_tx_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE goals ADD CONSTRAINT fk_goals_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE subscriptions ADD CONSTRAINT fk_subscriptions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE",
+    "ALTER TABLE subscription_transactions ADD CONSTRAINT fk_sub_trans_sub FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE",
+    "ALTER TABLE subscription_transactions ADD CONSTRAINT fk_sub_trans_trans FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE",
+];
+
+foreach ($foreignKeys as $fkSql) {
+    try {
+        @$conn->query($fkSql);
+    } catch (Throwable $ignored) {
+        // Silently skip if already existing or if hosting engine does not allow FK
     }
 }
 
