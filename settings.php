@@ -3,6 +3,23 @@ include 'php/auth_check.php';
 include_once 'php/db.php';
 
 $user_id = $_SESSION['user_id'];
+
+// Ensure optional user preference columns exist
+try {
+    $colsNeeded = [
+        'currency'           => "ALTER TABLE users ADD COLUMN currency VARCHAR(10) DEFAULT 'INR'",
+        'theme'              => "ALTER TABLE users ADD COLUMN theme VARCHAR(20) DEFAULT 'light'",
+        'remember_token'     => "ALTER TABLE users ADD COLUMN remember_token VARCHAR(255) NULL",
+        'notification_prefs' => "ALTER TABLE users ADD COLUMN notification_prefs TEXT NULL DEFAULT NULL",
+    ];
+    foreach ($colsNeeded as $col => $sql) {
+        $c = $conn->query("SHOW COLUMNS FROM users LIKE '$col'");
+        if ($c && $c->num_rows === 0) {
+            $conn->query($sql);
+        }
+    }
+} catch (Throwable $e) {}
+
 $stmt = $conn->prepare("SELECT username, email, created_at, currency, theme, notification_prefs FROM users WHERE id = ?");
 $stmt->bind_param("i", $user_id);
 $stmt->execute();
@@ -22,6 +39,15 @@ $notifs = json_decode($user_data['notification_prefs'] ?? '{}', true);
     <title>Settings | ExpenseTracker</title>
     <link rel="stylesheet" href="<?= asset('css/main.css') ?>">
     <link rel="stylesheet" href="<?= asset('css/settings.css') ?>">
+    <script>
+    // Apply density and theme preferences immediately to prevent layout shift
+    (function() {
+      const density = localStorage.getItem('navbarDensity');
+      if (density === 'compact') document.documentElement.classList.add('compact-mode');
+      const theme = localStorage.getItem('theme') || '<?= htmlspecialchars($user_data['theme'] ?? 'light') ?>';
+      if (theme === 'dark') document.documentElement.classList.add('dark-mode');
+    })();
+    </script>
 </head>
 <body>
     <?php include 'php/header.php'; ?>

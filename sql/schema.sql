@@ -4,6 +4,10 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(50) NOT NULL,
     email VARCHAR(100) NOT NULL UNIQUE,
     password VARCHAR(255) NOT NULL,
+    currency VARCHAR(10) DEFAULT 'INR',
+    theme VARCHAR(20) DEFAULT 'light',
+    remember_token VARCHAR(255) NULL,
+    notification_prefs TEXT NULL DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

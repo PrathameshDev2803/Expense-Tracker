@@ -93,6 +93,7 @@ $migrations = [
         currency VARCHAR(10) DEFAULT 'INR',
         theme VARCHAR(20) DEFAULT 'light',
         remember_token VARCHAR(255) NULL,
+        notification_prefs TEXT NULL DEFAULT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )",
 
@@ -210,6 +211,25 @@ $foreignKeys = [
     "ALTER TABLE subscription_transactions ADD CONSTRAINT fk_sub_trans_sub FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE",
     "ALTER TABLE subscription_transactions ADD CONSTRAINT fk_sub_trans_trans FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE",
 ];
+
+// Ensure existing users table has all required columns
+$userColumns = [
+    'currency'           => "ALTER TABLE users ADD COLUMN currency VARCHAR(10) DEFAULT 'INR'",
+    'theme'              => "ALTER TABLE users ADD COLUMN theme VARCHAR(20) DEFAULT 'light'",
+    'remember_token'     => "ALTER TABLE users ADD COLUMN remember_token VARCHAR(255) NULL",
+    'notification_prefs' => "ALTER TABLE users ADD COLUMN notification_prefs TEXT NULL DEFAULT NULL",
+];
+
+foreach ($userColumns as $colName => $alterSql) {
+    try {
+        $colCheck = $conn->query("SHOW COLUMNS FROM users LIKE '$colName'");
+        if ($colCheck && $colCheck->num_rows === 0) {
+            if ($conn->query($alterSql)) {
+                renderMessage('success', "Column `users.$colName`", 'Added column successfully');
+            }
+        }
+    } catch (Throwable $ignored) {}
+}
 
 foreach ($foreignKeys as $fkSql) {
     try {
