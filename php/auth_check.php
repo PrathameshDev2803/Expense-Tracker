@@ -7,11 +7,46 @@ if (session_status() === PHP_SESSION_NONE) {
 // Load asset & cache management helper
 require_once __DIR__ . '/asset_helper.php';
 
+if (!function_exists('get_currencies_config')) {
+    function get_currencies_config() {
+        return [
+            'INR' => [
+                'code' => 'INR',
+                'symbol' => '₹',
+                'name' => 'Indian Rupee',
+                'locale' => 'en-IN',
+                'decimals' => 2
+            ],
+            'USD' => [
+                'code' => 'USD',
+                'symbol' => '$',
+                'name' => 'US Dollar',
+                'locale' => 'en-US',
+                'decimals' => 2
+            ],
+            'EUR' => [
+                'code' => 'EUR',
+                'symbol' => '€',
+                'name' => 'Euro',
+                'locale' => 'de-DE',
+                'decimals' => 2
+            ],
+            'GBP' => [
+                'code' => 'GBP',
+                'symbol' => '£',
+                'name' => 'British Pound',
+                'locale' => 'en-GB',
+                'decimals' => 2
+            ]
+        ];
+    }
+}
+
 if (!function_exists('get_currency_symbol')) {
     function get_currency_symbol($code) {
+        $configs = get_currencies_config();
         $code = strtoupper((string)$code);
-        $symbols = ['INR'=>'₹', 'USD'=>'$', 'EUR'=>'€', 'GBP'=>'£'];
-        return $symbols[$code] ?? '₹';
+        return $configs[$code]['symbol'] ?? '₹';
     }
 }
 

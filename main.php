@@ -54,13 +54,6 @@ include 'php/get_analytics.php';
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
   <script>
     window.CSRF_TOKEN = "<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>";
-    // Apply density preference immediately to prevent layout shift
-    (function() {
-      const density = localStorage.getItem('navbarDensity');
-      if (density === 'compact') document.documentElement.classList.add('compact-mode');
-      const theme = localStorage.getItem('theme');
-      if (theme === 'dark') document.documentElement.classList.add('dark-mode');
-    })();
   </script>
   <style>
     :root {
@@ -2462,7 +2455,7 @@ include 'php/get_analytics.php';
               <span><?php echo $_SESSION['currency_symbol'] ?? '₹'; ?><span id="minVal">0</span></span>
               <input type="range" id="minAmount" min="0" max="100000" step="100" value="0">
               <input type="range" id="maxAmount" min="0" max="100000" step="100" value="100000">
-              <span><?php echo $_SESSION['currency_symbol'] ?? '₹'; ?><span id="maxVal">100000</span></span>
+              <span><?php echo $_SESSION['currency_symbol'] ?? '₹'; ?><span id="maxVal"><?= round(CurrencyService::convert(100000, 'INR', $_SESSION['currency'] ?? 'INR')) ?></span></span>
             </div>
           </div>
         </div>
@@ -3184,9 +3177,10 @@ include 'php/get_analytics.php';
       const parts = value.split('.');
       if (parts.length > 2) value = parts[0] + '.' + parts.slice(1).join('');
 
-      // Format with commas (Indian numbering system approximation or standard)
+      // Format with commas according to active currency locale
       if (parts[0].length > 0) {
-        parts[0] = Number(parts[0]).toLocaleString('en-IN');
+        const activeLocale = (window.CURRENCIES && window.CURRENCIES[window.CURRENCY_CODE]) ? window.CURRENCIES[window.CURRENCY_CODE].locale : 'en-IN';
+        parts[0] = Number(parts[0]).toLocaleString(activeLocale);
       }
 
       e.target.value = parts.join('.');
@@ -3225,10 +3219,16 @@ include 'php/get_analytics.php';
       const logItem = document.createElement("li");
       logItem.textContent = `${entry.time} - ${type.toUpperCase()} - ${category}: ${window.CURRENCY_SYMBOL}${entry.amount} ${desc ? "(" + desc + ")" : ""}`;
       // document.getElementById("logList").appendChild(logItem); // Removed old list logic
+      let baseAmount = parseFloat(amount);
+      const baseCurr = window.BASE_CURRENCY || 'INR';
+      if (window.CURRENCY_CODE && window.CURRENCY_CODE !== baseCurr) {
+        baseAmount = window.convertCurrency(baseAmount, window.CURRENCY_CODE, baseCurr);
+        baseAmount = Math.round(baseAmount * 100) / 100;
+      }
       const params = new URLSearchParams({
         type,
         category,
-        amount,
+        amount: baseAmount,
         description: desc,
       });
       if (editingId) {
@@ -3444,7 +3444,9 @@ include 'php/get_analytics.php';
             const isIncome = entry.type === 'income';
             const sign = isIncome ? '+' : '−';
             const amountClass = isIncome ? 'income' : 'expense';
-            const formattedAmount = `${sign}${window.CURRENCY_SYMBOL}${parseFloat(entry.amount).toLocaleString()}`;
+            const base = window.BASE_CURRENCY || 'INR';
+            const convertedAmount = window.convertCurrency(parseFloat(entry.amount), base, window.CURRENCY_CODE);
+            const formattedAmount = `${sign}${window.formatCurrency(convertedAmount, true, 2, true)}`;
 
             // Remarks Formatting
             const remarksHtml = entry.description 
@@ -3471,7 +3473,11 @@ include 'php/get_analytics.php';
                 const item = document.querySelector(`.dropdown-item[data-value="${entry.category}"]`);
                 if(item) selectCategory(entry.category, item);
               }, 100);
-              document.getElementById('amount').value = entry.amount;
+              const base = window.BASE_CURRENCY || 'INR';
+              const dispVal = (window.CURRENCY_CODE && window.CURRENCY_CODE !== base)
+                ? window.convertCurrency(parseFloat(entry.amount), base, window.CURRENCY_CODE).toFixed(2)
+                : entry.amount;
+              document.getElementById('amount').value = dispVal;
               document.getElementById('desc').value = entry.description || '';
               document.getElementById('addEntry').dataset.editingId = entry.id;
               document.getElementById('addEntryText').textContent = 'Update Entry';
@@ -3541,12 +3547,18 @@ include 'php/get_analytics.php';
 
     function animateValue(id, start, end, duration) {
       const obj = document.getElementById(id);
+      if (!obj) return;
       let startTimestamp = null;
+      const base = window.BASE_CURRENCY || 'INR';
+      const targetConverted = (window.CURRENCY_CODE && window.CURRENCY_CODE !== base)
+        ? window.convertCurrency(end, base, window.CURRENCY_CODE)
+        : end;
       const step = (timestamp) => {
         if (!startTimestamp) startTimestamp = timestamp;
         const progress = Math.min((timestamp - startTimestamp) / duration, 1);
-        const value = Math.floor(progress * (end - start) + start);
-        obj.textContent = `${window.CURRENCY_SYMBOL}${value.toLocaleString()}`;
+        const currentVal = progress * (targetConverted - start) + start;
+        const decimals = (window.CURRENCY_CODE === 'INR') ? 0 : 2;
+        obj.textContent = window.formatCurrency(currentVal, true, decimals, true);
         if (progress < 1) {
           window.requestAnimationFrame(step);
         }
@@ -3624,15 +3636,18 @@ include 'php/get_analytics.php';
             animateValue("month-inc", 0, data.monthEarning, 1000);
             animateValue("month-bal", 0, data.monthEarning - data.monthExpense, 1000);
             updateInsight("month-insight", data.monthEarning, data.monthExpense);
-            renderMonthlyChart(data.monthEarning, data.monthExpense);
+            const base = window.BASE_CURRENCY || 'INR';
+            const convMonthEarning = window.convertCurrency(data.monthEarning, base, window.CURRENCY_CODE);
+            const convMonthExpense = window.convertCurrency(data.monthExpense, base, window.CURRENCY_CODE);
+            renderMonthlyChart(convMonthEarning, convMonthExpense);
             if (Array.isArray(data.categoryExpense)) {
               const categories = data.categoryExpense.map(item => item.category);
-              const values = data.categoryExpense.map(item => parseFloat(item.total));
+              const values = data.categoryExpense.map(item => window.convertCurrency(parseFloat(item.total), base, window.CURRENCY_CODE));
               renderExpenseCategoryChart(categories, values);
             }
             if (Array.isArray(data.categoryIncome)) {
               const incomeCats = data.categoryIncome.map(item => item.category);
-              const incomeVals = data.categoryIncome.map(item => parseFloat(item.total));
+              const incomeVals = data.categoryIncome.map(item => window.convertCurrency(parseFloat(item.total), base, window.CURRENCY_CODE));
               renderIncomeCategoryChart(incomeCats, incomeVals);
             }
           }
@@ -3874,11 +3889,7 @@ include 'php/get_analytics.php';
                   const current = tooltipItems.find(item => item.dataset.label === 'Current');
                   const previous = tooltipItems.find(item => item.dataset.label === 'Previous');
 
-                  const formatCurrency = (val) => val.toLocaleString('en-IN', {
-                    style: 'currency',
-                    currency: 'INR',
-                    maximumFractionDigits: 0
-                  });
+                  const formatCurrency = (val) => window.formatCurrency ? window.formatCurrency(val, true, 0, true) : ((window.CURRENCY_SYMBOL || '₹') + Math.round(Number(val) || 0).toLocaleString());
 
                   let lines = [`Current:  ${formatCurrency(current.parsed.y)}`];
 
@@ -3893,7 +3904,8 @@ include 'php/get_analytics.php';
                   const previous = tooltipItems.find(i => i.dataset.label === 'Previous').parsed.y;
                   const diff = current - previous;
                   const sign = diff >= 0 ? '+' : '-';
-                  return `Difference: ${sign}${Math.abs(diff).toLocaleString('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 })}`;
+                  const formattedDiff = window.formatCurrency ? window.formatCurrency(Math.abs(diff), true, 0, true) : ((window.CURRENCY_SYMBOL || '₹') + Math.round(Math.abs(diff)).toLocaleString());
+                  return `Difference: ${sign}${formattedDiff}`;
                 }
               }
             }
@@ -3925,7 +3937,7 @@ include 'php/get_analytics.php';
                   size: 11
                 },
                 callback: function(value) {
-                  return '₹' + (value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value);
+                  return (window.CURRENCY_SYMBOL || '₹') + (value >= 1000 ? (value / 1000).toFixed(1) + 'k' : value);
                 }
               },
               border: {
@@ -4073,7 +4085,8 @@ include 'php/get_analytics.php';
           ctx.textBaseline = 'middle';
           ctx.font = '600 1.75rem sans-serif';
           ctx.fillStyle = netBalance >= 0 ? '#059669' : '#dc2626';
-          ctx.fillText('₹' + netBalance.toLocaleString('en-IN'), centerX, centerY - 8);
+          const formattedNet = window.formatCurrency ? window.formatCurrency(netBalance, true, 0, true) : ((window.CURRENCY_SYMBOL || '₹') + Math.round(netBalance).toLocaleString());
+          ctx.fillText(formattedNet, centerX, centerY - 8);
 
           // Sub-label
           ctx.font = '500 0.8rem sans-serif';
@@ -4180,7 +4193,7 @@ include 'php/get_analytics.php';
               cornerRadius: 8,
               displayColors: false,
               callbacks: {
-                label: (context) => '₹' + context.parsed.y.toLocaleString('en-IN'),
+                label: (context) => window.formatCurrency ? window.formatCurrency(context.parsed.y, true, 0, true) : ((window.CURRENCY_SYMBOL || '₹') + context.parsed.y.toLocaleString()),
                 afterLabel: (context) => context.dataIndex === 0 ? '⚠️ Highest Spend' : ''
               },
               titleFont: {
@@ -4219,7 +4232,7 @@ include 'php/get_analytics.php';
                 font: {
                   size: 10
                 },
-                callback: (val) => val >= 1000 ? '₹' + (val / 1000).toFixed(0) + 'k' : val
+                callback: (val) => val >= 1000 ? (window.CURRENCY_SYMBOL || '₹') + (val / 1000).toFixed(0) + 'k' : val
               },
               border: {
                 display: false
@@ -4281,7 +4294,7 @@ include 'php/get_analytics.php';
               cornerRadius: 8,
               displayColors: false,
               callbacks: {
-                label: (context) => '₹' + context.parsed.y.toLocaleString('en-IN'),
+                label: (context) => window.formatCurrency ? window.formatCurrency(context.parsed.y, true, 0, true) : ((window.CURRENCY_SYMBOL || '₹') + context.parsed.y.toLocaleString()),
                 afterLabel: (context) => {
                   const pct = totalIncome > 0 ? (context.parsed.y / totalIncome * 100).toFixed(0) : 0;
                   return context.dataIndex === 0 ? `🏆 Primary (${pct}%)` : `Contribution: ${pct}%`;
@@ -4323,7 +4336,7 @@ include 'php/get_analytics.php';
                 font: {
                   size: 10
                 },
-                callback: (val) => val >= 1000 ? '₹' + (val / 1000).toFixed(0) + 'k' : val
+                callback: (val) => val >= 1000 ? (window.CURRENCY_SYMBOL || '₹') + (val / 1000).toFixed(0) + 'k' : val
               },
               border: {
                 display: false
@@ -4501,8 +4514,12 @@ include 'php/get_analytics.php';
 
       // 3. Amount Range
       if (minAmount > 0 || maxAmount < 100000) {
-        const formatK = (num) => num >= 1000 ? (num / 1000) + 'k' : num;
-        activeFilters.push(`₹${formatK(minAmount)}–₹${formatK(maxAmount)}`);
+        const formatK = (num) => num >= 1000 ? (num / 1000).toFixed(1) + 'k' : Math.round(num);
+        const base = window.BASE_CURRENCY || 'INR';
+        const convMin = window.convertCurrency(minAmount, base, window.CURRENCY_CODE);
+        const convMax = window.convertCurrency(maxAmount, base, window.CURRENCY_CODE);
+        const sym = window.CURRENCY_SYMBOL || '₹';
+        activeFilters.push(`${sym}${formatK(convMin)}–${sym}${formatK(convMax)}`);
       }
 
       if (activeFilters.length === 0) {
@@ -4605,7 +4622,9 @@ include 'php/get_analytics.php';
       document.getElementById("minAmount").value = 0;
       document.getElementById("maxAmount").value = 100000;
       document.getElementById("minVal").textContent = "0";
-      document.getElementById("maxVal").textContent = "100000";
+      const base = window.BASE_CURRENCY || 'INR';
+      const convMax = window.convertCurrency(100000, base, window.CURRENCY_CODE);
+      document.getElementById("maxVal").textContent = Math.round(convMax).toLocaleString();
 
       // Reset Sort UI
       document.getElementById("sortLabel").textContent = "Sort: Date (Newest)";
@@ -4666,7 +4685,8 @@ include 'php/get_analytics.php';
       // Metadata
       const reportType = activeEntRange.charAt(0).toUpperCase() + activeEntRange.slice(1);
       const period = document.getElementById("entDateLabel").textContent;
-      const exportDate = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+      const activeLocale = (window.CURRENCIES && window.CURRENCIES[window.CURRENCY_CODE]) ? window.CURRENCIES[window.CURRENCY_CODE].locale : 'en-IN';
+      const exportDate = new Date().toLocaleString(activeLocale, { dateStyle: 'medium', timeStyle: 'short' });
 
       const metaStyle = { name: 'Arial', size: 10, color: { argb: 'FF555555' } };
       worksheet.getCell('A2').value = `Report Type: ${reportType}`;
@@ -4683,7 +4703,10 @@ include 'php/get_analytics.php';
         if (row.type === 'income') totalIncome += amt;
         else if (row.type === 'expense') totalExpense += amt;
       });
-      const netBalance = totalIncome - totalExpense;
+      const base = window.BASE_CURRENCY || 'INR';
+      const convIncome = window.convertCurrency(totalIncome, base, window.CURRENCY_CODE);
+      const convExpense = window.convertCurrency(totalExpense, base, window.CURRENCY_CODE);
+      const netBalance = convIncome - convExpense;
 
       // Summary Box Styling
       const summaryStartRow = 6;
@@ -4701,11 +4724,12 @@ include 'php/get_analytics.php';
 
       // Data
       const summaryData = [
-        { label: 'Total Income', value: totalIncome, color: 'FF166534' }, // Green
-        { label: 'Total Expense', value: totalExpense, color: 'FFDC2626' }, // Red
+        { label: 'Total Income', value: convIncome, color: 'FF166534' }, // Green
+        { label: 'Total Expense', value: convExpense, color: 'FFDC2626' }, // Red
         { label: 'Net Balance', value: netBalance, color: netBalance >= 0 ? 'FF166534' : 'FFDC2626' }
       ];
 
+      const excelCurrencyFmt = `"${window.CURRENCY_SYMBOL || '₹'}"#,##0`;
       summaryData.forEach((item, idx) => {
         const r = summaryStartRow + 1 + idx;
         const labelCell = worksheet.getCell(`A${r}`);
@@ -4713,7 +4737,7 @@ include 'php/get_analytics.php';
         
         labelCell.value = item.label;
         valCell.value = item.value;
-        valCell.numFmt = '₹#,##0';
+        valCell.numFmt = excelCurrencyFmt;
         
         labelCell.font = { bold: true };
         valCell.font = { bold: true, color: { argb: item.color } };
@@ -4724,7 +4748,7 @@ include 'php/get_analytics.php';
       // 4. Transaction Table
       const tableHeadRowIdx = 11;
       const headerRow = worksheet.getRow(tableHeadRowIdx);
-      headerRow.values = ['Date', 'Time', 'Category', 'Type', 'Amount (₹)', 'Description'];
+      headerRow.values = ['Date', 'Time', 'Category', 'Type', `Amount (${window.CURRENCY_SYMBOL || '₹'})`, 'Description'];
       
       headerRow.eachCell(cell => {
         cell.font = { name: 'Arial', size: 12, bold: true, color: { argb: 'FFFFFFFF' } };
@@ -4745,12 +4769,13 @@ include 'php/get_analytics.php';
         const [hr, min, sec] = timePart.split(':').map(Number);
         const dateObj = new Date(Date.UTC(y, m - 1, d, hr, min, sec));
 
+        const convRowAmount = window.convertCurrency(parseFloat(entry.amount), base, window.CURRENCY_CODE);
         row.values = [
           dateObj,
           dateObj,
           entry.category,
           entry.type.charAt(0).toUpperCase() + entry.type.slice(1),
-          parseFloat(entry.amount),
+          convRowAmount,
           entry.description || ''
         ];
 
@@ -4764,7 +4789,7 @@ include 'php/get_analytics.php';
         row.getCell(3).alignment = { horizontal: 'left' };
         row.getCell(4).alignment = { horizontal: 'center' };
         
-        row.getCell(5).numFmt = '₹#,##0';
+        row.getCell(5).numFmt = excelCurrencyFmt;
         row.getCell(5).alignment = { horizontal: 'right' };
         row.getCell(5).font = { color: { argb: entry.type === 'income' ? 'FF166534' : 'FFDC2626' } };
         
@@ -4856,11 +4881,15 @@ include 'php/get_analytics.php';
     // Amount slider sync
     document.getElementById("minAmount").addEventListener("input", (e) => {
       minAmount = parseInt(e.target.value);
-      document.getElementById("minVal").textContent = minAmount;
+      const base = window.BASE_CURRENCY || 'INR';
+      const conv = window.convertCurrency(minAmount, base, window.CURRENCY_CODE);
+      document.getElementById("minVal").textContent = Math.round(conv).toLocaleString();
     });
     document.getElementById("maxAmount").addEventListener("input", (e) => {
       maxAmount = parseInt(e.target.value);
-      document.getElementById("maxVal").textContent = maxAmount;
+      const base = window.BASE_CURRENCY || 'INR';
+      const conv = window.convertCurrency(maxAmount, base, window.CURRENCY_CODE);
+      document.getElementById("maxVal").textContent = Math.round(conv).toLocaleString();
     });
 
     // Amount Popover Logic

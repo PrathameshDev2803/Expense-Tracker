@@ -47,18 +47,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     } 
     elseif ($form_id === 'preferencesForm') {
-        $currency = $_POST['currency'] ?? 'INR';
+        $currency = strtoupper(trim($_POST['currency'] ?? 'INR'));
+        $configs = get_currencies_config();
         // Validate currency
-        if (!in_array($currency, ['INR', 'USD', 'EUR', 'GBP'])) {
-             echo json_encode(['success' => false, 'error' => 'Invalid currency']);
+        if (!array_key_exists($currency, $configs)) {
+             echo json_encode(['success' => false, 'error' => 'Invalid currency selection']);
              exit;
         }
         $stmt = $conn->prepare("UPDATE users SET currency = ? WHERE id = ?");
         $stmt->bind_param("si", $currency, $user_id);
         if ($stmt->execute()) {
-            $response = ['success' => true, 'message' => 'Preferences saved'];
+            $_SESSION['currency'] = $currency;
+            $_SESSION['currency_symbol'] = get_currency_symbol($currency);
+            $_SESSION['preferences_loaded'] = true;
+
+            require_once __DIR__ . '/currency_service.php';
+            $ratesData = CurrencyService::getExchangeRates(EXPENSE_TRACKER_BASE_CURRENCY);
+            $rate = CurrencyService::getRate(EXPENSE_TRACKER_BASE_CURRENCY, $currency);
+
+            $response = [
+                'success' => true,
+                'message' => 'Currency preference updated successfully',
+                'currency' => $currency,
+                'symbol' => $_SESSION['currency_symbol'],
+                'base_currency' => EXPENSE_TRACKER_BASE_CURRENCY,
+                'exchange_rate' => $rate,
+                'rates' => $ratesData['rates'] ?? [],
+                'last_updated' => $ratesData['last_updated'] ?? date('Y-m-d H:i:s'),
+                'is_cached' => $ratesData['is_cached'] ?? false
+            ];
         } else {
-            $response = ['success' => false, 'error' => 'Database error'];
+            $response = ['success' => false, 'error' => 'Database error while saving currency preference'];
         }
     }
     elseif ($form_id === 'appearanceForm') {
@@ -91,9 +110,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif ($form_id === 'securityForm') {
         $current = $_POST['current_password'] ?? '';
         $new = $_POST['new_password'] ?? '';
+        $confirm = $_POST['confirm_password'] ?? '';
         
-        if (empty($current) || empty($new)) {
-            echo json_encode(['success' => false, 'error' => 'All fields are required']);
+        if (empty($current) || empty($new) || empty($confirm)) {
+            echo json_encode(['success' => false, 'error' => 'All password fields are required']);
+            exit;
+        }
+
+        if ($new !== $confirm) {
+            echo json_encode(['success' => false, 'error' => 'New password and confirmation do not match']);
+            exit;
+        }
+
+        if ($current === $new) {
+            echo json_encode(['success' => false, 'error' => 'New password cannot be identical to current password']);
             exit;
         }
         
@@ -118,7 +148,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($update->execute()) {
                 $response = ['success' => true, 'message' => 'Password updated successfully'];
             } else {
-                $response = ['success' => false, 'error' => 'Update failed'];
+                $response = ['success' => false, 'error' => 'Database error updating password'];
             }
         } else {
             $response = ['success' => false, 'error' => 'Incorrect current password'];

@@ -181,6 +181,16 @@ $migrations = [
         attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         INDEX idx_ip_action_time (ip_address, action_type, attempt_time)
     )",
+
+    'currency_rates' => "CREATE TABLE IF NOT EXISTS currency_rates (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        base_currency VARCHAR(10) NOT NULL,
+        target_currency VARCHAR(10) NOT NULL,
+        rate DECIMAL(18, 8) NOT NULL,
+        last_updated DATETIME NOT NULL,
+        source VARCHAR(50) DEFAULT 'open.er-api.com',
+        UNIQUE KEY uq_pair (base_currency, target_currency)
+    )",
 ];
 
 $successCount = 0;

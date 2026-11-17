@@ -38,11 +38,15 @@ function sendAuthResponse(bool $success, string $message, string $redirect = '',
             http_response_code($statusCode);
             header('Content-Type: application/json; charset=utf-8');
         }
+        $clientRedirect = ltrim(preg_replace('#^(\.\./)+#', '', $redirect), '/');
+        if ($clientRedirect === '') {
+            $clientRedirect = 'main.php';
+        }
         echo json_encode([
             'success' => $success,
             'message' => $message,
             'field' => $field,
-            'redirect' => $redirect
+            'redirect' => $clientRedirect
         ]);
         exit;
     }
@@ -116,7 +120,7 @@ if (strlen($password) > 4096) {
 }
 
 // 6. Prepared SQL Query Execution
-$stmt = $conn->prepare("SELECT id, username, password FROM users WHERE email = ? LIMIT 1");
+$stmt = $conn->prepare("SELECT id, username, password, currency, theme FROM users WHERE email = ? LIMIT 1");
 if (!$stmt) {
     logLoginDiagnostic('SQL Prepare Error', $conn->error);
     sendAuthResponse(false, 'A system error occurred. Please try again.', '', 'general', 500, $email);
@@ -163,6 +167,12 @@ if (session_status() === PHP_SESSION_ACTIVE) {
 
 $_SESSION["user_id"] = (int)$user["id"];
 $_SESSION["username"] = $user["username"];
+$userCurrency = !empty($user["currency"]) ? $user["currency"] : 'INR';
+$_SESSION["currency"] = $userCurrency;
+$_SESSION["theme"] = !empty($user["theme"]) ? $user["theme"] : 'light';
+require_once __DIR__ . '/auth_check.php';
+$_SESSION["currency_symbol"] = get_currency_symbol($userCurrency);
+$_SESSION['preferences_loaded'] = true;
 
 // 10. Handle Remember Me
 if (!empty($_POST['remember'])) {

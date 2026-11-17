@@ -11,15 +11,6 @@ require_once 'php/setup_subscriptions.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Subscriptions</title>
     <link rel="stylesheet" href="<?= asset('css/main.css') ?>">
-    <script>
-    // Apply density preference immediately to prevent layout shift
-    (function() {
-      const density = localStorage.getItem('navbarDensity');
-      if (density === 'compact') document.documentElement.classList.add('compact-mode');
-      const theme = localStorage.getItem('theme');
-      if (theme === 'dark') document.documentElement.classList.add('dark-mode');
-    })();
-    </script>
     <style>
         :root {
             /* --- THEME TOKENS (Light Mode Default) --- */
@@ -547,10 +538,10 @@ require_once 'php/setup_subscriptions.php';
 <script>
     // Utils
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', {
+        return window.formatCurrency ? window.formatCurrency(amount, true, 2, false) : new Intl.NumberFormat(undefined, {
             style: 'currency',
             currency: window.CURRENCY_CODE || 'INR',
-            maximumFractionDigits: 0
+            maximumFractionDigits: 2
         }).format(amount);
     };
 

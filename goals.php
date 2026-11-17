@@ -195,11 +195,20 @@ include 'php/setup_goals.php';
                     </div>
                 </div>
 
+                <?php
+                require_once __DIR__ . '/php/currency_service.php';
+                $activeGoalCurr = $_SESSION['currency'] ?? 'INR';
+                $p500 = ($activeGoalCurr === 'INR') ? 500 : round(CurrencyService::convert(500, 'INR', $activeGoalCurr));
+                $p1000 = ($activeGoalCurr === 'INR') ? 1000 : round(CurrencyService::convert(1000, 'INR', $activeGoalCurr));
+                $p2500 = ($activeGoalCurr === 'INR') ? 2500 : round(CurrencyService::convert(2500, 'INR', $activeGoalCurr));
+                $p5000 = ($activeGoalCurr === 'INR') ? 5000 : round(CurrencyService::convert(5000, 'INR', $activeGoalCurr));
+                $sym = $_SESSION['currency_symbol'] ?? '₹';
+                ?>
                 <div class="amount-presets">
-                    <button type="button" class="preset-btn" data-amount="500">+<?php echo $_SESSION['currency_symbol'] ?? '₹'; ?>500</button>
-                    <button type="button" class="preset-btn" data-amount="1000">+<?php echo $_SESSION['currency_symbol'] ?? '₹'; ?>1,000</button>
-                    <button type="button" class="preset-btn" data-amount="2500">+<?php echo $_SESSION['currency_symbol'] ?? '₹'; ?>2,500</button>
-                    <button type="button" class="preset-btn" data-amount="5000">+<?php echo $_SESSION['currency_symbol'] ?? '₹'; ?>5,000</button>
+                    <button type="button" class="preset-btn" data-amount="<?= $p500 ?>">+<?= $sym ?><?= number_format($p500) ?></button>
+                    <button type="button" class="preset-btn" data-amount="<?= $p1000 ?>">+<?= $sym ?><?= number_format($p1000) ?></button>
+                    <button type="button" class="preset-btn" data-amount="<?= $p2500 ?>">+<?= $sym ?><?= number_format($p2500) ?></button>
+                    <button type="button" class="preset-btn" data-amount="<?= $p5000 ?>">+<?= $sym ?><?= number_format($p5000) ?></button>
                 </div>
 
                 <div class="live-feedback hidden" id="liveFeedback" aria-live="polite">
@@ -289,11 +298,9 @@ include 'php/setup_goals.php';
             fetchGoals();
 
             // --- Live Preview Helper ---
-            const moneyFmt = new Intl.NumberFormat('en-IN', { 
-                style: 'currency', 
-                currency: window.CURRENCY_CODE || 'INR', 
-                maximumFractionDigits: 0 
-            });
+            const moneyFmt = {
+                format: (val) => window.formatCurrency ? window.formatCurrency(val, true, 0) : ((window.CURRENCY_SYMBOL || '₹') + Math.round(Number(val) || 0).toLocaleString())
+            };
 
             function updateLivePreview() {
                 // Update Name
@@ -311,8 +318,8 @@ include 'php/setup_goals.php';
                 const startVal = parseFloat(createInputs.start.value) || 0;
                 
                 // If target is empty or 0, show placeholder
-                livePreview.target.textContent = (targetVal && targetVal > 0) ? moneyFmt.format(targetVal) : (window.CURRENCY_SYMBOL + '50,000');
-                livePreview.saved.textContent = moneyFmt.format(startVal);
+                livePreview.target.textContent = (targetVal && targetVal > 0) ? window.formatCurrency(targetVal, true, 0, true) : (window.CURRENCY_SYMBOL + '50,000');
+                livePreview.saved.textContent = window.formatCurrency(startVal, true, 0, true);
 
                 // Update Progress Bar
                 if(targetVal > 0) {
@@ -348,12 +355,14 @@ include 'php/setup_goals.php';
 
             function updateAddLivePreview() {
                 const addVal = parseFloat(addMoneyElements.input.value) || 0;
+                const base = window.BASE_CURRENCY || 'INR';
+                const addValBase = (window.CURRENCY_CODE && window.CURRENCY_CODE !== base)
+                    ? window.convertCurrency(addVal, window.CURRENCY_CODE, base)
+                    : addVal;
                 const currentSaved = parseFloat(addMoneyElements.currentSaved.value) || 0;
                 const target = parseFloat(addMoneyElements.currentTarget.value) || 1; // avoid div/0
                 
-                let newTotal = currentSaved + addVal;
-                // Cap at target for calculation if we want, or just let it show >100? 
-                // Req: "Cap at 100%"
+                let newTotal = currentSaved + addValBase;
                 if(newTotal > target) newTotal = target;
 
                 // Calculate exact percentages
@@ -380,14 +389,6 @@ include 'php/setup_goals.php';
                 if (addVal > 0) {
                     addMoneyElements.feedbackBox.classList.remove('hidden');
                     
-                    // Main Feedback: "This will bring you to 26.1%"
-                    // Or "This moves you ahead by +0.15%"
-                    // Let's go with "This will bring you to X%" as the primary, 
-                    // and maybe show the Diff too?
-                    // User Request "Replace static percentage text with dynamic precision-aware text".
-                    // Examples: "This will bring you to 26.1%", "This moves you ahead by +0.15%"
-                    
-                    // Logic: If completed, show special message. 
                     if (newPercentClamped >= 100) {
                         addMoneyElements.predictPercent.textContent = "100%";
                         addMoneyElements.feedbackBox.querySelector('.feedback-main').innerHTML = `🎉 This completes your goal!`;
@@ -395,34 +396,17 @@ include 'php/setup_goals.php';
                         addMoneyElements.submitBtn.textContent = "Complete Goal";
                     } else {
                         addMoneyElements.predictPercent.textContent = `${dispNewPercent}%`;
-                        
-                        // Show "Moves you ahead by +X%" if relevant? 
-                        // Let's stick to the requested "This will bring you to..." structure but add diff context if needed?
-                        // Actually, the user GAVE examples of what it COULD be. 
-                        // "This will bring you to <strong id="...">26.1%</strong>" is what the HTML has.
-                        // So I will update the text content of that strong tag.
-                        
-                        // Handle standard interaction
                         addMoneyElements.feedbackBox.querySelector('.feedback-main').innerHTML = `This will bring you to <strong>${dispNewPercent}%</strong>`;
                         
-                        // If progress is very small but positive (<0.1%), we might want to ensure user sees something.
-                        // But toFixed(1) handles 0.05 -> 0.1 usually. 
-                        // If actual diff is > 0 but < 0.05, it might show 0.0 change if we just look at total.
-                        // Let's check diff.
                         if (addVal > 0 && diff > 0 && diff < 0.05) {
-                             // It might not move the needle on the absolute scale visually much,
-                             // but we can acknowledge it. 
-                             // However, "This will bring you to 26.0%" when you were at 26.0% is confusing. 
-                             // So if dispNewPercent === oldPercentClamped.toFixed(1), force update?
-                             if(dispNewPercent === oldPercentClamped.toFixed(1)) {
-                                 // Force show next increment? Or show 2 decimals?
-                                 // "26.05% (optional if precision allows)"
-                                 addMoneyElements.feedbackBox.querySelector('.feedback-main').innerHTML = `This will bring you to <strong>${newPercentClamped.toFixed(2)}%</strong>`;
-                             }
+                            if(dispNewPercent === oldPercentClamped.toFixed(1)) {
+                                addMoneyElements.feedbackBox.querySelector('.feedback-main').innerHTML = `This will bring you to <strong>${newPercentClamped.toFixed(2)}%</strong>`;
+                            }
                         }
 
                         addMoneyElements.predictRemaining.textContent = moneyFmt.format(remaining);
-                        addMoneyElements.submitBtn.textContent = `Add ${moneyFmt.format(addVal)} to Goal`;
+                        const addValFormatted = window.formatCurrency(addVal, true, (window.CURRENCY_CODE === 'INR' ? 0 : 2), true);
+                        addMoneyElements.submitBtn.textContent = `Add ${addValFormatted} to Goal`;
                     }
                     
                     addMoneyElements.submitBtn.disabled = false;
@@ -454,7 +438,11 @@ include 'php/setup_goals.php';
                 
                 // Set Fields
                 createInputs.name.value = data.name;
-                createInputs.target.value = data.target;
+                const base = window.BASE_CURRENCY || 'INR';
+                const dispTarget = (window.CURRENCY_CODE && window.CURRENCY_CODE !== base)
+                    ? Math.round(window.convertCurrency(parseFloat(data.target), base, window.CURRENCY_CODE))
+                    : data.target;
+                createInputs.target.value = dispTarget;
                 if(data.deadline) document.getElementById('deadline').value = data.deadline;
                 
                 // Set Icon
@@ -521,11 +509,18 @@ include 'php/setup_goals.php';
                 e.preventDefault();
                 const iconVal = document.querySelector('input[name="goalIcon"]:checked').value;
                 const editId = document.getElementById('editGoalId').value;
+                const base = window.BASE_CURRENCY || 'INR';
+                let rawTarget = parseFloat(document.getElementById('targetAmount').value) || 0;
+                let rawStart = parseFloat(document.getElementById('startingAmount').value) || 0;
+                if (window.CURRENCY_CODE && window.CURRENCY_CODE !== base) {
+                    rawTarget = Math.round(window.convertCurrency(rawTarget, window.CURRENCY_CODE, base) * 100) / 100;
+                    rawStart = Math.round(window.convertCurrency(rawStart, window.CURRENCY_CODE, base) * 100) / 100;
+                }
                 
                 const formData = {
                     action: editId ? 'update' : 'create',
                     goal_name: document.getElementById('goalName').value,
-                    target_amount: document.getElementById('targetAmount').value,
+                    target_amount: rawTarget,
                     deadline: document.getElementById('deadline').value,
                     icon: iconVal
                 };
@@ -533,7 +528,7 @@ include 'php/setup_goals.php';
                 if(editId) {
                     formData.goal_id = editId;
                 } else {
-                    formData.saved_amount = document.getElementById('startingAmount').value || 0;
+                    formData.saved_amount = rawStart;
                 }
 
                 try {
@@ -557,10 +552,15 @@ include 'php/setup_goals.php';
 
             document.getElementById('addMoneyForm').addEventListener('submit', async (e) => {
                 e.preventDefault();
+                let rawAdd = parseFloat(document.getElementById('addAmount').value) || 0;
+                const base = window.BASE_CURRENCY || 'INR';
+                if (window.CURRENCY_CODE && window.CURRENCY_CODE !== base) {
+                    rawAdd = Math.round(window.convertCurrency(rawAdd, window.CURRENCY_CODE, base) * 100) / 100;
+                }
                 const formData = {
                     action: 'add_funds',
                     goal_id: document.getElementById('addMoneyGoalId').value,
-                    amount: document.getElementById('addAmount').value
+                    amount: rawAdd
                 };
 
                 // Optimistic UI could be done here, but let's wait for server
@@ -715,7 +715,7 @@ include 'php/setup_goals.php';
                 const iconSvgContent = goalIcons[goal.icon] || goalIcons['target'];
                 const iconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">${iconSvgContent}</svg>`;
 
-                const fmt = new Intl.NumberFormat('en-IN', { style: 'currency', currency: window.CURRENCY_CODE || 'INR', maximumFractionDigits: 0 });
+                const fmt = moneyFmt;
                 const displayPercent = percent.toFixed(1).replace(/\.0$/, '');
                 const remaining = Math.max(0, target - saved);
                 const safeGoalName = escapeHtml(goal.goal_name);

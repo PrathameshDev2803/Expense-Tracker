@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function resolveEndpoint(relativePath) {
         const base = getAppBasePath().replace(/\/+$/, '');
-        const cleanRel = relativePath.replace(/^\/+/, '');
+        const cleanRel = relativePath.replace(/^(\.\.\/|\.\/|\/)+/, '');
         return `${base}/${cleanRel}`;
     }
 
@@ -402,7 +402,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Handle successful account creation
                 if (ok && data.success) {
                     showToast("Account created! Redirecting...", 'success');
-                    let redirectTarget = data.redirect || 'menu.php';
+                    let redirectTarget = (data.redirect || 'menu.php').replace(/^(\.\.\/)+/, '');
                     if (!redirectTarget.startsWith('http://') && !redirectTarget.startsWith('https://') && !redirectTarget.startsWith('/')) {
                         redirectTarget = resolveEndpoint(redirectTarget);
                     }
@@ -575,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 if (ok && data.success) {
-                    let redirectTarget = data.redirect || 'main.php';
+                    let redirectTarget = (data.redirect || 'main.php').replace(/^(\.\.\/)+/, '');
                     if (!redirectTarget.startsWith('http://') && !redirectTarget.startsWith('https://') && !redirectTarget.startsWith('/')) {
                         redirectTarget = resolveEndpoint(redirectTarget);
                     }

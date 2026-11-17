@@ -67,3 +67,14 @@ CREATE TABLE IF NOT EXISTS subscription_transactions (
     FOREIGN KEY (subscription_id) REFERENCES subscriptions(id) ON DELETE CASCADE,
     FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE CASCADE
 );
+
+-- Currency Rates Cache Table
+CREATE TABLE IF NOT EXISTS currency_rates (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    base_currency VARCHAR(10) NOT NULL,
+    target_currency VARCHAR(10) NOT NULL,
+    rate DECIMAL(18, 8) NOT NULL,
+    last_updated DATETIME NOT NULL,
+    source VARCHAR(50) DEFAULT 'open.er-api.com',
+    UNIQUE KEY uq_pair (base_currency, target_currency)
+);

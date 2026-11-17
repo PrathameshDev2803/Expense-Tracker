@@ -175,4 +175,33 @@ $analyticsData = [
         'tension' => 0.4
     ]
 ];
+
+// If active display currency is not the base currency (INR), convert analytics balances for display
+$activeDisplayCurrency = $_SESSION['currency'] ?? 'INR';
+if ($activeDisplayCurrency !== 'INR') {
+    require_once __DIR__ . '/currency_service.php';
+    $rate = CurrencyService::getRate('INR', $activeDisplayCurrency);
+    if ($rate > 0 && $rate != 1.0) {
+        foreach ($analyticsData as $periodKey => &$periodData) {
+            if (!empty($periodData['current'])) {
+                $periodData['current'] = array_map(function($val) use ($rate) {
+                    return round((float)$val * $rate, 2);
+                }, $periodData['current']);
+            }
+            if (!empty($periodData['previous'])) {
+                $periodData['previous'] = array_map(function($val) use ($rate) {
+                    return round((float)$val * $rate, 2);
+                }, $periodData['previous']);
+            }
+            if (!empty($periodData['events'])) {
+                foreach ($periodData['events'] as &$ev) {
+                    if (isset($ev['amount'])) {
+                        $ev['amount'] = round((float)$ev['amount'] * $rate, 2);
+                    }
+                }
+            }
+        }
+        unset($periodData);
+    }
+}
 ?>
