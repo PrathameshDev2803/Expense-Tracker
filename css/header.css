@@ -1,10 +1,28 @@
 /* --- GLOBAL NAVBAR STYLES (Clean Financial SaaS) --- */
+:root {
+  --background-surface: #ffffff;
+  --border-color: #e5e7eb;
+  --border-color-light: #f9fafb;
+  --brand-primary: #3b82f6;
+  --text-primary: #111827;
+  --text-secondary: #6b7280;
+}
+
+html.dark-mode {
+  --background-surface: #1e293b;
+  --border-color: #334155;
+  --border-color-light: #475569;
+  --brand-primary: #60a5fa;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+}
+
 .app-header {
   position: sticky;
   top: 24px;
   z-index: 1000;
-  background: var(--background-surface);
-  border: 1px solid var(--border-color);
+  background: var(--background-surface, #ffffff);
+  border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 16px;
   padding: 0 24px;
   height: 72px;
@@ -15,8 +33,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  box-shadow: 0 8px 30px -6px rgba(0, 0, 0, 0.05);
-  /* Very subtle premium shadow */
+  box-shadow: 0 8px 30px -6px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   transition: all 0.3s ease;
 }
 

@@ -613,4 +613,282 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    // --- 7. Data Portability & Financial Data Export (CSV Only) ---
+    const exportForm = document.getElementById('exportForm');
+    const datasetSelect = document.getElementById('exportDataset');
+    const dateRangeSelect = document.getElementById('exportDateRange');
+    const customDatesWrapper = document.getElementById('customDatesWrapper');
+    const exportStartDate = document.getElementById('exportStartDate');
+    const exportEndDate = document.getElementById('exportEndDate');
+    const validationAlert = document.getElementById('exportValidationAlert');
+    const btnTriggerExport = document.getElementById('btnTriggerExport');
+    const formatNotice = document.getElementById('exportFormatNotice');
+    const datasetHelperText = document.getElementById('datasetHelperText');
+    const btnClearHistoryBtn = document.getElementById('btnClearHistoryBtn');
+    const historyEmptyState = document.getElementById('historyEmptyState');
+    const historyTableContainer = document.getElementById('historyTableContainer');
+    const historyTableRows = document.getElementById('historyTableRows');
+
+    if (exportForm && btnTriggerExport) {
+        const userId = window.CURRENT_USER_ID || 'guest';
+        const HISTORY_STORAGE_KEY = `expenseTracker_export_history_${userId}`;
+
+        function updateDatasetNotice() {
+            const currentDataset = datasetSelect?.value || 'all';
+            if (formatNotice) {
+                if (currentDataset === 'all') {
+                    formatNotice.innerHTML = 'Complete financial export packages separate CSV files into a clean <strong>.ZIP</strong> archive.';
+                } else {
+                    formatNotice.innerHTML = 'Selected dataset downloads directly as a spreadsheet-compatible <strong>.CSV</strong> file.';
+                }
+            }
+
+            if (datasetHelperText) {
+                switch (currentDataset) {
+                    case 'transactions':
+                        datasetHelperText.textContent = 'Exports all income and expense ledger transactions, including amounts, categories, and timestamps in CSV format.';
+                        break;
+                    case 'goals':
+                        datasetHelperText.textContent = 'Exports all financial and savings targets, target amounts, saved progress, and deadlines in CSV format.';
+                        break;
+                    case 'subscriptions':
+                        datasetHelperText.textContent = 'Exports recurring subscriptions, average cost, billing frequencies, and next scheduled billing dates in CSV format.';
+                        break;
+                    case 'account':
+                        datasetHelperText.textContent = 'Exports non-sensitive account metadata, email, member since date, base currency, and preferences in CSV format.';
+                        break;
+                    default:
+                        datasetHelperText.textContent = 'Downloads all financial records packaged as separate CSV files inside a single ZIP archive.';
+                        break;
+                }
+            }
+        }
+
+        if (datasetSelect) {
+            datasetSelect.addEventListener('change', updateDatasetNotice);
+        }
+
+        // Toggle custom date range pickers
+        if (dateRangeSelect && customDatesWrapper) {
+            dateRangeSelect.addEventListener('change', () => {
+                if (dateRangeSelect.value === 'custom') {
+                    customDatesWrapper.style.display = 'grid';
+                    if (!exportStartDate.value) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - 30);
+                        exportStartDate.value = d.toISOString().split('T')[0];
+                    }
+                    if (!exportEndDate.value) {
+                        exportEndDate.value = new Date().toISOString().split('T')[0];
+                    }
+                } else {
+                    customDatesWrapper.style.display = 'none';
+                }
+                hideValidationError();
+            });
+        }
+
+        function showValidationError(message) {
+            if (!validationAlert) return;
+            validationAlert.textContent = message;
+            validationAlert.style.display = 'block';
+        }
+
+        function hideValidationError() {
+            if (!validationAlert) return;
+            validationAlert.textContent = '';
+            validationAlert.style.display = 'none';
+        }
+
+        // --- Export History ---
+        function getExportHistory() {
+            try {
+                const stored = localStorage.getItem(HISTORY_STORAGE_KEY);
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                return [];
+            }
+        }
+
+        function saveExportRecord(record) {
+            try {
+                const list = getExportHistory();
+                list.unshift(record);
+                if (list.length > 20) list.pop();
+                localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(list));
+                renderExportHistory();
+            } catch (e) {
+                console.warn('Could not save export history', e);
+            }
+        }
+
+        function renderExportHistory() {
+            if (!historyTableRows || !historyEmptyState || !historyTableContainer) return;
+            const list = getExportHistory();
+
+            if (list.length === 0) {
+                historyEmptyState.style.display = 'block';
+                historyTableContainer.style.display = 'none';
+                historyTableRows.innerHTML = '';
+                return;
+            }
+
+            historyEmptyState.style.display = 'none';
+            historyTableContainer.style.display = 'block';
+
+            historyTableRows.innerHTML = list.map(item => {
+                const isZip = (item.format || '').toUpperCase() === 'ZIP';
+                const badgeClass = isZip ? 'badge-zip' : 'badge-csv';
+                const displayFormat = isZip ? 'ZIP' : 'CSV';
+                return `
+                    <tr>
+                        <td>${escapeHtml(item.date)}</td>
+                        <td><span class="history-badge ${badgeClass}">${escapeHtml(displayFormat)}</span></td>
+                        <td>${escapeHtml(item.datasetLabel)}</td>
+                        <td>${escapeHtml(item.dateScope)}</td>
+                        <td><span class="status-pill-completed"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg> Completed</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        if (btnClearHistoryBtn) {
+            btnClearHistoryBtn.addEventListener('click', () => {
+                localStorage.removeItem(HISTORY_STORAGE_KEY);
+                renderExportHistory();
+                showToast('Export history log cleared', 'success');
+            });
+        }
+
+        // Initialize
+        renderExportHistory();
+        updateDatasetNotice();
+
+        // --- Handle Export Submission ---
+        exportForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            hideValidationError();
+
+            const dataset = datasetSelect ? datasetSelect.value : 'all';
+            const dateRange = dateRangeSelect ? dateRangeSelect.value : 'all';
+            const startDate = exportStartDate ? exportStartDate.value.trim() : '';
+            const endDate = exportEndDate ? exportEndDate.value.trim() : '';
+
+            // Client-side validations
+            if (dateRange === 'custom') {
+                if (!startDate || !endDate) {
+                    showValidationError('Please provide both Start Date and End Date for the custom date range.');
+                    return;
+                }
+                if (startDate > endDate) {
+                    showValidationError('Start date cannot be after end date.');
+                    return;
+                }
+            }
+
+            // Set Loading UI state
+            btnTriggerExport.disabled = true;
+            const originalBtnHtml = btnTriggerExport.innerHTML;
+            btnTriggerExport.innerHTML = `
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+                    <circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle>
+                    <path d="M12 2a10 10 0 0 1 10 10"></path>
+                </svg>
+                <span>Generating Export...</span>
+            `;
+
+            const formData = new FormData(exportForm);
+            formData.set('format', 'csv');
+            if (window.CSRF_TOKEN && !formData.has('csrf_token')) {
+                formData.append('csrf_token', window.CSRF_TOKEN);
+            }
+
+            try {
+                const response = await fetch('php/export_data.php', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errData = await response.json().catch(() => null);
+                    const errMsg = (errData && errData.error) ? errData.error : `Export failed with HTTP error ${response.status}`;
+                    showValidationError(errMsg);
+                    showToast(errMsg, 'error');
+                    return;
+                }
+
+                // Extract filename from Content-Disposition header if available
+                let downloadFilename = '';
+                const disposition = response.headers.get('content-disposition');
+                if (disposition && disposition.includes('filename=')) {
+                    const match = disposition.match(/filename="?([^";]+)"?/);
+                    if (match && match[1]) {
+                        downloadFilename = match[1].trim();
+                    }
+                }
+
+                const todayStr = new Date().toISOString().split('T')[0];
+                if (!downloadFilename) {
+                    if (dataset === 'all') {
+                        downloadFilename = `expensetracker-complete-export-${todayStr}.zip`;
+                    } else {
+                        downloadFilename = `expensetracker-${dataset}-${todayStr}.csv`;
+                    }
+                }
+
+                const blob = await response.blob();
+                const downloadUrl = window.URL.createObjectURL(blob);
+                const tempLink = document.createElement('a');
+                tempLink.style.display = 'none';
+                tempLink.href = downloadUrl;
+                tempLink.download = downloadFilename;
+                document.body.appendChild(tempLink);
+                tempLink.click();
+
+                setTimeout(() => {
+                    window.URL.revokeObjectURL(downloadUrl);
+                    tempLink.remove();
+                }, 1000);
+
+                showToast(`Financial data export downloaded: ${downloadFilename}`, 'success');
+
+                // Determine effective format badge for history
+                const historyFormat = (dataset === 'all') ? 'ZIP' : 'CSV';
+
+                let datasetLabel = 'Complete Financial Data';
+                if (dataset === 'transactions') datasetLabel = 'Transactions';
+                else if (dataset === 'goals') datasetLabel = 'Goals';
+                else if (dataset === 'subscriptions') datasetLabel = 'Subscriptions';
+                else if (dataset === 'account') datasetLabel = 'Account Information';
+
+                let dateScopeLabel = 'All Time';
+                if (dateRange === 'last30') dateScopeLabel = 'Last 30 Days';
+                else if (dateRange === 'last90') dateScopeLabel = 'Last 90 Days';
+                else if (dateRange === 'last12m') dateScopeLabel = 'Last 12 Months';
+                else if (dateRange === 'custom') dateScopeLabel = `${startDate} to ${endDate}`;
+
+                const exportTime = new Date().toLocaleString(undefined, {
+                    month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                });
+
+                saveExportRecord({
+                    date: exportTime,
+                    format: historyFormat,
+                    datasetLabel: datasetLabel,
+                    dateScope: dateScopeLabel,
+                    filename: downloadFilename
+                });
+
+            } catch (networkErr) {
+                console.error('Export download error:', networkErr);
+                const msg = 'Network error occurred while generating your export. Please check connection and try again.';
+                showValidationError(msg);
+                showToast(msg, 'error');
+            } finally {
+                btnTriggerExport.disabled = false;
+                btnTriggerExport.innerHTML = originalBtnHtml;
+            }
+        });
+    }
+
 });

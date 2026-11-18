@@ -588,19 +588,135 @@ $created_date = !empty($user_data['created_at']) ? date('M j, Y', strtotime($use
                             </div>
                         </div>
 
-                        <div class="action-card-box">
-                            <div class="action-copy">
+                        <!-- Export Financial Data Card -->
+                        <div class="export-financial-section">
+                            <div class="export-section-intro">
                                 <h4>Export Financial Data</h4>
-                                <p>Download your complete transaction ledger in standard CSV format for spreadsheets or tax filing.</p>
+                                <p>Download your complete financial records in standard formats for spreadsheets, personal records, or tax filing.</p>
                             </div>
-                            <a href="main.php" class="btn-secondary-link">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                                    <polyline points="7 10 12 15 17 10"></polyline>
-                                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                                </svg>
-                                <span>Go to Dashboard Export</span>
-                            </a>
+
+                            <div class="export-currency-banner" role="note">
+                                <div class="banner-icon" aria-hidden="true">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                </div>
+                                <div class="banner-text">
+                                    Financial records are exported in your ledger's base currency (<strong><?= htmlspecialchars(EXPENSE_TRACKER_BASE_CURRENCY) ?></strong>) to preserve exact accounting values and transaction history.
+                                </div>
+                            </div>
+
+                            <!-- Export Configuration Form -->
+                            <form id="exportForm" class="export-config-box" novalidate>
+                                <input type="hidden" name="csrf_token" value="<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>">
+                                <input type="hidden" name="format" value="csv">
+
+                                <div class="export-options-grid">
+                                    <!-- 1. Data Selection -->
+                                    <div class="form-field-group">
+                                        <label for="exportDataset" class="field-label-text">
+                                            <span>Data Selection</span>
+                                            <span class="label-scope-tag">(CSV Format)</span>
+                                        </label>
+                                        <div class="input-container">
+                                            <select id="exportDataset" name="dataset" class="export-select-control">
+                                                <option value="all" selected>Complete Financial Export (All Datasets - ZIP)</option>
+                                                <option value="transactions">Transactions (CSV)</option>
+                                                <option value="goals">Goals (CSV)</option>
+                                                <option value="subscriptions">Recurring Subscriptions (CSV)</option>
+                                                <option value="account">Account Information (CSV)</option>
+                                            </select>
+                                        </div>
+                                        <span class="field-sub-hint" id="datasetHelperText">
+                                            Downloads all financial records packaged as separate CSV files inside a single ZIP archive.
+                                        </span>
+                                    </div>
+
+                                    <!-- 2. Date Range Selection -->
+                                    <div class="form-field-group" id="dateRangeContainer">
+                                        <label for="exportDateRange" class="field-label-text">
+                                            <span>Date Range</span>
+                                            <span class="label-scope-tag">(Applies to transactions)</span>
+                                        </label>
+                                        <div class="input-container">
+                                            <select id="exportDateRange" name="date_range" class="export-select-control">
+                                                <option value="all" selected>All Time</option>
+                                                <option value="last30">Last 30 Days</option>
+                                                <option value="last90">Last 90 Days</option>
+                                                <option value="last12m">Last 12 Months</option>
+                                                <option value="custom">Custom Date Range</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. Custom Date Range Pickers (Toggled when "custom" is selected) -->
+                                    <div class="custom-dates-wrapper" id="customDatesWrapper" style="display: none;">
+                                        <div class="form-field-group">
+                                            <label for="exportStartDate" class="field-label-text">Start Date</label>
+                                            <div class="input-container">
+                                                <input type="date" id="exportStartDate" name="start_date" max="<?= date('Y-m-d') ?>">
+                                            </div>
+                                        </div>
+                                        <div class="form-field-group">
+                                            <label for="exportEndDate" class="field-label-text">End Date</label>
+                                            <div class="input-container">
+                                                <input type="date" id="exportEndDate" name="end_date" max="<?= date('Y-m-d') ?>">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Validation Alert Message Container -->
+                                <div id="exportValidationAlert" class="export-feedback-banner error" style="display: none;" role="alert"></div>
+
+                                <!-- Action Footer with Export Button & Status -->
+                                <div class="export-action-bar">
+                                    <button type="submit" id="btnTriggerExport" class="btn-save-primary export-btn-main">
+                                        <svg class="btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                                            <polyline points="7 10 12 15 17 10"></polyline>
+                                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                                        </svg>
+                                        <span id="btnExportText">Export Data</span>
+                                    </button>
+                                    <div class="export-format-notice" id="exportFormatNotice">
+                                        Individual datasets download directly as <strong>.CSV</strong>. Complete export downloads as a <strong>.ZIP</strong> archive containing all CSV files.
+                                    </div>
+                                </div>
+                            </form>
+
+                            <!-- Export History Section -->
+                            <div class="export-history-wrapper" id="exportHistoryContainer">
+                                <div class="history-top-bar">
+                                    <div class="history-headings">
+                                        <h5>Recent Exports</h5>
+                                        <span>Log of exports generated during this session</span>
+                                    </div>
+                                    <button type="button" id="btnClearHistoryBtn" class="btn-clear-history" title="Clear recorded export history">
+                                        Clear History
+                                    </button>
+                                </div>
+                                <div id="historyEmptyState" class="history-empty-message">
+                                    No recent exports yet. Select your preferences above and click <strong>Export Data</strong>.
+                                </div>
+                                <div id="historyTableContainer" class="history-table-responsive" style="display: none;">
+                                    <table class="history-data-table" aria-label="Recent Exports">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col">Export Date</th>
+                                                <th scope="col">Format</th>
+                                                <th scope="col">Dataset</th>
+                                                <th scope="col">Date Range</th>
+                                                <th scope="col">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="historyTableRows">
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -698,6 +814,7 @@ $created_date = !empty($user_data['created_at']) ? date('M j, Y', strtotime($use
 
     <script>
         window.CSRF_TOKEN = "<?= htmlspecialchars($_SESSION['csrf_token'] ?? '') ?>";
+        window.CURRENT_USER_ID = <?= (int)$user_id ?>;
     </script>
     <script src="<?= asset('js/settings.js') ?>"></script>
 </body>
